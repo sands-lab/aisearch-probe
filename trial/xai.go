@@ -28,14 +28,14 @@ import (
 // instead of answering from memory (verified against xAI's Responses gateway,
 // which takes the untagged "auto"|"none"|"required"). Without a forced call,
 // "no request arrived" is ambiguous between "the page was cached" and "the model
-// never looked" — which is the whole reason -force-search defaults on. When the
+// never looked" — which is the whole reason -forceFetch defaults on. When the
 // tool is present but not forced we still pin "auto", because xAI's API may
 // otherwise leave the tool unused and answer from its own knowledge silently.
 //
 // Attribution caveat, MEASURED (PROVIDERS.md § "xAI's fetcher does not identify
 // itself"): xAI's fetcher forges ordinary-browser user-agents and fires several
 // requests per ask. So a fetch is attributed by the per-provider probe TOKEN in
-// the URL, never by user-agent. -check must confirm a request actually reaches
+// the URL, never by user-agent. -checkVendors must confirm a request actually reaches
 // us before any result is believed.
 
 type xaiVendor struct{}

@@ -51,7 +51,7 @@ var openRouterUser string
 //	                         through its own index. Out of scope; see
 //	                         FINDINGS.md § Scope.
 //
-// Add either back with -openrouter-models if the situation changes, but re-read
+// Add either back with -openrouterModels if the situation changes, but re-read
 // the "who fetched" line before believing the numbers.
 //
 // THE CHEAP MODEL IS THE DEFAULT, and the point is more runs, not a smaller
@@ -62,12 +62,12 @@ var openRouterUser string
 //
 // The model each one replaced is kept in largeOpenRouterModels: whether a big
 // and a small model at one vendor share a stored copy is its own question, and
-// answering it needs both. Pass both to -openrouter-models to run that.
+// answering it needs both. Pass both to -openrouterModels to run that.
 //
 // VERIFY BEFORE TRUSTING A SWAP. A cheaper model that answers from memory
 // instead of calling its tool produces "nothing reached the server", which
 // reads as caching and is a lie. claude-opus-5 did exactly that — answered in
-// 1.5s without fetching — which is why 4.8 was pinned here before. Run -check
+// 1.5s without fetching — which is why 4.8 was pinned here before. Run -checkVendors
 // after any change to this list and read the who-fetched line.
 var defaultOpenRouterModels = []string{
 	"openai/gpt-5-mini", // $0.25 in / $2.00 out, replacing gpt-5.5 at $5 / $30
@@ -77,7 +77,7 @@ var defaultOpenRouterModels = []string{
 	// model and silently substitutes its own fetcher, so every result would be
 	// about OpenRouter's cache rather than Anthropic's. sonnet-5 was checked the
 	// same way and `anthropic-query` arrived. This is the failure D9 warns
-	// about, caught by -check exactly as intended.
+	// about, caught by -checkVendors exactly as intended.
 	//
 	// Dots, not dashes: "claude-sonnet-5" happens to be the same either way, but
 	// "claude-opus-4-8" is Anthropic's own API style and OpenRouter silently

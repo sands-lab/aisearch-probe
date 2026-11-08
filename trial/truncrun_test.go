@@ -8,117 +8,47 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// The plan is pure (no network): Part A is one scan per (provider, size); Part B
-// is a warm+reask pair per (provider, size) on ITS OWN page, warm on the top marker
-// and reask on the bottom, so a Part A fetch can never satisfy a Part B question.
+// The plan is pure (no network): one scan per (provider, size), each on its own
+// page, with the size in the path.
 func TestTruncActionsExpand(t *testing.T) {
 	provs := []Caller{{Name: "or:openai", Model: "openai/gpt-5-mini"}}
 	sizes := truncLadder()
-	acts := buildTruncActions(provs, "https://h", "run1", sizes, 1, "", false)
-
-	var scans, warms, reasks int
-	byPage := map[string][]*TruncAction{}
+	acts := buildTruncActions(provs, "https://h", "run1", sizes, 1, "")
+	ids := map[string]bool{}
 	for _, a := range acts {
-		byPage[a.PageID] = append(byPage[a.PageID], a)
-		switch a.Step {
-		case "scan":
-			scans++
-		case "warm":
-			warms++
-		case "reask":
-			reasks++
+		if a.Step != "scan" {
+			t.Errorf("%s: step %q, want only scans", a.ID, a.Step)
 		}
 		if strings.Contains(a.URL, "?") {
 			t.Errorf("%s uses a query — a provider could strip it", a.URL)
 		}
-		want := "/depthpage/" + a.PageID + "/" + strconv.Itoa(a.Bytes)
+		want := "/depthhtmlpage/" + a.PageID + "/" + strconv.Itoa(a.Bytes)
 		if !strings.Contains(a.URL, want) {
 			t.Errorf("URL %q does not carry the size in the path (%q)", a.URL, want)
 		}
+		ids[a.PageID] = true
 	}
-
-	n := len(provs) * len(sizes)
-	if scans != n {
-		t.Errorf("got %d Part A scans, want %d (one per provider*size)", scans, n)
-	}
-	if warms != n || reasks != n {
-		t.Errorf("got %d warms / %d reasks, want %d each (Part B pair per provider*size)", warms, reasks, n)
-	}
-
-	// Every Part B page is exactly a warm+reask pair; warm targets the top, reask
-	// the bottom (deepest depth). Part A pages are single scans.
-	deepest := probe.DepthPercents[len(probe.DepthPercents)-1]
-	for id, pair := range byPage {
-		if pair[0].Part == "A" {
-			if len(pair) != 1 || pair[0].Step != "scan" {
-				t.Errorf("Part A page %s is not a single scan: %+v", id, pair)
-			}
-			continue
-		}
-		if len(pair) != 2 {
-			t.Fatalf("Part B page %s has %d actions, want warm+reask", id, len(pair))
-		}
-		var warm, reask *TruncAction
-		for _, a := range pair {
-			switch a.Step {
-			case "warm":
-				warm = a
-			case "reask":
-				reask = a
-			}
-		}
-		if warm == nil || reask == nil {
-			t.Fatalf("Part B page %s missing warm or reask: %+v", id, pair)
-		}
-		if warm.URL != reask.URL || warm.Bytes != reask.Bytes {
-			t.Errorf("Part B page %s: warm and reask must be the SAME address", id)
-		}
-		if warm.TargetPct != 0 {
-			t.Errorf("Part B page %s: warm targets %d%%, want the top (0%%)", id, warm.TargetPct)
-		}
-		if reask.TargetPct != deepest {
-			t.Errorf("Part B page %s: reask targets %d%%, want the bottom (%d%%)", id, reask.TargetPct, deepest)
-		}
-	}
-
-	// Part A and Part B never share a page id.
-	for id, pair := range byPage {
-		parts := map[string]bool{}
-		for _, a := range pair {
-			parts[a.Part] = true
-		}
-		if len(parts) != 1 {
-			t.Errorf("page %s mixes Part A and Part B", id)
-		}
+	if n := len(provs) * len(sizes); len(acts) != n || len(ids) != n {
+		t.Errorf("got %d actions on %d pages, want %d of each", len(acts), len(ids), n)
 	}
 }
 
-// reps multiplies the plan: each (provider, size) gets `reps` independent Part A
-// pages and `reps` independent Part B pairs, with distinct page ids (fresh pages),
+// reps multiplies the plan: each (provider, size) gets `reps` independent pages,
 // so a noisy tool is sampled n=reps rather than once.
 func TestTruncActionsReps(t *testing.T) {
 	provs := []Caller{{Name: "openai", Model: "gpt-5-mini"}}
 	sizes := []int{64 << 10, 128 << 10}
 	reps := 3
-	acts := buildTruncActions(provs, "https://h", "run1", sizes, reps, "", false)
-
-	var scans int
+	acts := buildTruncActions(provs, "https://h", "run1", sizes, reps, "")
 	ids := map[string]bool{}
 	for _, a := range acts {
-		if a.Step == "scan" {
-			scans++
-		}
 		ids[a.PageID] = true
 	}
-	if scans != len(sizes)*reps {
-		t.Errorf("got %d scans, want %d (size*reps)", scans, len(sizes)*reps)
-	}
-	// Distinct pages: reps * sizes for Part A + reps * sizes for Part B.
-	if len(ids) != 2*len(sizes)*reps {
-		t.Errorf("got %d distinct page ids, want %d (fresh page per rep)", len(ids), 2*len(sizes)*reps)
+	if len(acts) != len(sizes)*reps || len(ids) != len(sizes)*reps {
+		t.Errorf("got %d scans on %d pages, want %d (size*reps)", len(acts), len(ids), len(sizes)*reps)
 	}
 	// reps <= 0 behaves as a single rep, never zero actions.
-	if got := buildTruncActions(provs, "https://h", "run1", sizes, 0, "", false); len(got) != len(buildTruncActions(provs, "https://h", "run1", sizes, 1, "", false)) {
+	if got := buildTruncActions(provs, "https://h", "run1", sizes, 0, ""); len(got) != len(sizes) {
 		t.Error("reps<=0 should behave as reps=1")
 	}
 }

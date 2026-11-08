@@ -49,7 +49,7 @@ import (
 // A FIXED PAGE NEVER GOES BACK TO BROKEN. Repeating an action changes nothing (the
 // first creation and flip times stay), as with the version switch.
 //
-// THE STATE IS SAVED TO A FILE (-heal-state-file) and read back at start-up, so an
+// THE STATE IS SAVED TO A FILE (-heal-serverStateFile) and read back at start-up, so an
 // origin restart mid-run does not turn fixed pages back into 404s. No file is an
 // empty start; a file that cannot be read is a start-up error.
 

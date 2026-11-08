@@ -310,7 +310,7 @@ func TestHealPinsAnthropicTool(t *testing.T) {
 // (its window reaches about 15 h, "around 16 h is good enough").
 func TestHealDefaultChecks(t *testing.T) {
 	if defaultHealChecks != "5m,10m,20m,40m,1h20m,2h40m,5h20m,10h40m" {
-		t.Errorf("-heal-checks default = %q", defaultHealChecks)
+		t.Errorf("-heal-askAgainTimes default = %q", defaultHealChecks)
 	}
 	got, err := parseHealChecks(defaultHealChecks)
 	if err != nil || len(got) != 8 {
@@ -347,7 +347,7 @@ func TestHealStateFile(t *testing.T) {
 	}
 }
 
-// -heal-report-json writes one row per page with the SAME reading as the printed
+// -heal-reportFile writes one row per page with the SAME reading as the printed
 // report (healOutcome), so a plot never re-derives the rules or needs the secret.
 func TestHealResultsRows(t *testing.T) {
 	st := healOnePage(t)

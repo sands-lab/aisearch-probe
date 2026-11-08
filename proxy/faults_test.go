@@ -333,7 +333,7 @@ func TestHealRemainingCountsDownAndStaysHealed(t *testing.T) {
 
 const faultTestSecret = "fault-test-secret"
 
-// newFaultServer wires the static server the way production runs it — `-serve`
+// newFaultServer wires the static server the way production runs it — `-serveDir`
 // mode, the logging handler calling the static server in-process
 // (NewHandlerWithBackend), with no reverse proxy between them. That matters for
 // /fault/cut: Go's ReverseProxy buffers a body with a known length and, when the

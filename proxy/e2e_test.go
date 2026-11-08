@@ -87,7 +87,7 @@ func e2eSetup(t *testing.T, origin http.Handler) (string, func() []probe.BotRepo
 }
 
 // e2eSetupBackend is e2eSetup for a backend the probe serves directly, with no
-// separate origin process — the -serve mode path.
+// separate origin process — the -serveDir mode path.
 func e2eSetupBackend(t *testing.T, backend http.Handler) (string, func() []probe.BotReport) {
 	t.Helper()
 	return e2eWire(t, func(logger *Logger) *Handler { return NewHandlerWithBackend(backend, logger, "") })

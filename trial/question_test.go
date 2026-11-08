@@ -35,8 +35,6 @@ var questionRegistry = map[string]string{
 	"trial correctionWarmQuestion":  "standard",
 	"trial correctionReaskQuestion": "standard",
 	"trial rotatedQuestion":         "standard",
-	"trial truncTopQuestion":        "standard",
-	"trial truncBottomQuestion":     "standard",
 	// approved exceptions (D14): the question is itself the measurement, or the page
 	// is not ours / has no depth codes
 	"trial truncScanQuestion": "exception", // read-depth part A: every code, to see how far down it read
@@ -132,8 +130,6 @@ func TestStandardQuestionsAreStandard(t *testing.T) {
 		"healReaskQuestion":       {healReaskQuestion, standardQuestion(50)},
 		"correctionWarmQuestion":  {correctionWarmQuestion, standardQuestion(deepest)},
 		"correctionReaskQuestion": {correctionReaskQuestion, standardQuestion(50)},
-		"truncTopQuestion":        {truncTopQuestion, standardQuestion(probe.DepthPercents[0])},
-		"truncBottomQuestion":     {truncBottomQuestion, standardQuestion(deepest)},
 	} {
 		if got[0] != got[1] {
 			t.Errorf("%s = %q, want the standard question %q", name, got[0], got[1])

@@ -155,7 +155,7 @@ func runListModels() {
 				anyUsable = m
 				if !probeAllModels {
 					fmt.Printf("\n  Stopping here — candidates are ordered cheapest first, so this is\n")
-					fmt.Printf("  the cheapest usable one. Use -all-models to probe every candidate.\n")
+					fmt.Printf("  the cheapest usable one. Use -listModelsAll to probe every candidate.\n")
 					break
 				}
 			}
@@ -163,7 +163,7 @@ func runListModels() {
 		fmt.Println()
 		if anyUsable != "" {
 			fmt.Printf("  Cheapest usable model: %s\n", anyUsable)
-			fmt.Printf("  Use it with:  -google-model %s\n", anyUsable)
+			fmt.Printf("  Use it with:  -googleModel %s\n", anyUsable)
 		} else {
 			fmt.Println("  Nothing is callable. If everything says OUT OF QUOTA, the cap is")
 			fmt.Println("  per-project per-day rather than per-model — wait for the reset or")

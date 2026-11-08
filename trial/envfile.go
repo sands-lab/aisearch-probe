@@ -114,7 +114,7 @@ func printNoCredentials(envPath string) {
 	fmt.Println()
 	fmt.Println("  Note: plain `source file` sets shell variables WITHOUT exporting")
 	fmt.Println("  them, so a child process sees nothing. Either let this tool read")
-	fmt.Println("  the file (-env-file, the default above), or export explicitly:")
+	fmt.Println("  the file (-keyFile, the default above), or export explicitly:")
 	fmt.Println("      set -a; source ~/.config/probe-trial/env; set +a")
 }
 

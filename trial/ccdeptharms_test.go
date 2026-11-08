@@ -48,7 +48,7 @@ func TestCcDepthArmsAreTheDesignedNineteen(t *testing.T) {
 // URL limit even with a long model tag.
 func TestCcDepthArmsBuildTheRightAddresses(t *testing.T) {
 	provs := []Caller{{Name: "openrouter-anthropic", Model: "anthropic/claude-sonnet-5-5-20260501"}}
-	pages := buildTTLPages(ccDepthArms(2048), provs, "https://probe.attentionhub.org", "run20261007-120000-abcde", 12, "secret", "")
+	pages := buildTTLPages(ccDepthArms(2048), provs, "https://probe.example.org", "run20261007-120000-abcde", 12, "secret", "")
 	seen := map[string]bool{}
 	for _, pg := range pages {
 		if seen[pg.PageID] {
@@ -178,29 +178,6 @@ func TestCcDepthAsksRotateTheNamedCode(t *testing.T) {
 		}
 		if question != rotatedQuestion(pct) {
 			t.Errorf("ask %d: question %q, want %q", ask, question, rotatedQuestion(pct))
-		}
-	}
-}
-
-// D14 (2026-10-25): depth pages checked against one code (the format runs) ask the
-// standard question for exactly that code (95%); only legacy pages without depth codes
-// (/page/, the old /depthpage/ size sweep) keep ttlmapQuestion.
-func TestTTLMapArmsAskTheStandardQuestion(t *testing.T) {
-	provs := []Caller{{Name: "openai", Model: "gpt-5-mini"}}
-	for _, pg := range buildTTLPages(formatArms(2048), provs, "https://p.example", "run1", 1, "secret", "RCP-2026-08") {
-		want := probe.DepthCode("secret", pg.PageID, 95, probe.DepthPageRevision)
-		for ask := 0; ask < 7; ask++ {
-			q, m := pg.askFor(ask)
-			if q != standardQuestion(95) || m != want || m != pg.Marker {
-				t.Fatalf("%s ask %d: question %q marker %q, want the standard depth-95%% question and its code", pg.Arm, ask, q, m)
-			}
-		}
-	}
-	for _, arms := range [][]ttlArm{defaultTTLArms(), depthSweepArms([]int{4096})} {
-		for _, pg := range buildTTLPages(arms, provs, "https://p.example", "run1", 1, "secret", "RCP-2026-08") {
-			if q, m := pg.askFor(0); q != ttlmapQuestion || m != "RCP-2026-08" {
-				t.Errorf("legacy %s: question %q marker %q, want ttlmapQuestion and the shared marker", pg.Arm, q, m)
-			}
 		}
 	}
 }

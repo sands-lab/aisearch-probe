@@ -60,7 +60,7 @@ func runConcurrent(n, workers int, fn func(i int)) {
 // was assumed and never tested): only the MODEL varies. Page size, the (normal)
 // header and the /page/ route are held fixed, so a TTL difference can only be the
 // model. Run it once per model (Stage 1 gpt-5-mini, Stage 2 gpt-5.5) by passing a
-// different -openai-model; the runner reads the active provider set as given.
+// different -openaiModel; the runner reads the active provider set as given.
 //
 // GROUND TRUTH is the FETCH in our log, never the answer text. The page prints a
 // site-wide reference code, so marker-present only confirms the model saw A page,
@@ -213,15 +213,7 @@ type ttlArm struct {
 	AskDepth *int
 }
 
-// defaultTTLArms is the plain TTL map: one arm on /page/, the fixed normal-header route.
-func defaultTTLArms() []ttlArm {
-	return []ttlArm{{
-		Label: "page",
-		URL:   func(base, id string) string { return strings.TrimRight(base, "/") + "/page/" + id },
-	}}
-}
-
-// ttlmapKeepAsking (-ttlmap-keep-asking) keeps re-asking a page after the vendor
+// ttlmapKeepAsking (-cacheHeaders-askAfterRefetch) keeps re-asking a page after the vendor
 // fetches it again, instead of retiring it. Off by default: a fetch-again restarts
 // the copy's clock, so later polls would time a new copy. On for the Anthropic
 // no-store follow-up (2026-10-18), whose question is whether a no-store page is
@@ -234,7 +226,7 @@ func retireAfter(fetchedAgain bool) bool {
 	return fetchedAgain && !ttlmapKeepAsking
 }
 
-// selectArms keeps only the arms named in a comma list (-ttlmap-arms), in the
+// selectArms keeps only the arms named in a comma list (-cacheHeaders-settings), in the
 // list's own order. Empty keeps all. An unknown label is an error, so a typo
 // cannot silently shrink a paid run.
 func selectArms(arms []ttlArm, labels string) ([]ttlArm, error) {
@@ -304,84 +296,6 @@ func ccDepthArms(size int) []ttlArm {
 		arm("max60", tag), arm("max60reval", tag), arm("smax60", tag), arm("max3600", tag),
 		arm("none", tag), arm("none", recent), arm("none", notag),
 	}
-}
-
-// depthSweepArms is the object-size EVICTION sweep: one arm per size on the
-// real-content /depthpage/ route (NOT /sizepage/, whose repeated-char filler is
-// stripped before ingestion — see FINDINGS.md "Filler must be real prose"). Real
-// prose scaled to the size means the fetcher actually ingests the bytes, so a
-// per-size difference in copy lifetime is a genuine size effect, not an artifact.
-func depthSweepArms(sizes []int) []ttlArm {
-	arms := make([]ttlArm, 0, len(sizes))
-	for _, sz := range sizes {
-		sz := sz
-		arms = append(arms, ttlArm{
-			Label: "depth-" + sizeLabel(sz),
-			URL: func(base, id string) string {
-				return strings.TrimRight(base, "/") + "/depthpage/" + id + "/" + strconv.Itoa(sz)
-			},
-		})
-	}
-	return arms
-}
-
-// formatArms is the object-type study (exp A): one arm per document format on the
-// UNIFIED depth routes at a FIXED size, so a fetcher's fetch/read/cache behaviour is
-// compared across formats with FORMAT the only variable. ONE shared source is encoded
-// into every format (proxy/depthformats.go), so txt/html/md/json/xml/csv/pdf/docx all
-// carry the same marker ladder at the same byte depths — the size is held fixed here,
-// and only the serialization differs.
-//
-// Every arm judges the read by the DEEPEST marker's per-page code: its presence means
-// the model read the document ALL THE WAY DOWN in that format (a shallower read, or no
-// read, leaves it absent). The code is per-page and unforgeable, so a marker learned on
-// the easy text arm cannot be replayed for the PDF/DOCX arm — it needs -page-code-secret
-// and proves the extractor parsed THAT document's body. Truncation-by-size is a separate
-// question (exp B varies the size); here the fixed small size keeps every arm cheap.
-func formatArms(size int) []ttlArm {
-	route := func(prefix string) func(base, id string) string {
-		return func(base, id string) string {
-			return strings.TrimRight(base, "/") + prefix + id + "/" + strconv.Itoa(size)
-		}
-	}
-	deepest := probe.DepthPercents[len(probe.DepthPercents)-1]
-	code := func(secret, id string) string {
-		return probe.DepthCode(secret, id, deepest, probe.DepthPageRevision)
-	}
-	arm := func(label, prefix string) ttlArm {
-		return ttlArm{Label: label, URL: route(prefix), Code: code, AskDepth: &deepest}
-	}
-	return []ttlArm{
-		arm("txt", "/depthtxtpage/"),
-		arm("html", "/depthhtmlpage/"),
-		arm("md", "/depthmdpage/"),
-		arm("json", "/depthjsonpage/"),
-		arm("xml", "/depthxmlpage/"),
-		arm("csv", "/depthcsvpage/"),
-		arm("pdf", "/depthpdfpage/"),
-		arm("docx", "/depthdocxpage/"),
-	}
-}
-
-// parseByteSizes turns "4096,65536,1048576" into [4096 65536 1048576]. Each size
-// must be a positive integer; a bad or empty list is an error, not silent.
-func parseByteSizes(s string) ([]int, error) {
-	var out []int
-	for _, part := range strings.Split(s, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		n, err := strconv.Atoi(part)
-		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("bad size %q (want a positive integer byte count)", part)
-		}
-		out = append(out, n)
-	}
-	if len(out) == 0 {
-		return nil, fmt.Errorf("no sizes given")
-	}
-	return out, nil
 }
 
 // parseDurations turns "15m,30m,1h,2h,4h,8h" into a back-off poll schedule. Each gap
@@ -456,11 +370,11 @@ func buildTTLPages(arms []ttlArm, provs []Caller, base, runID string, replicates
 // a short settle then one read attributes each page's fetch to its own ask).
 func runTTLMap(base string, provs []Caller, arms []ttlArm, replicates int, firstPoll, cadence, window time.Duration, pollGaps []time.Duration, secret, marker string, force, dry bool) int {
 	if base == "" {
-		fmt.Fprintln(os.Stderr, "error: -url is required (origin base)")
+		fmt.Fprintln(os.Stderr, "error: -siteUrl is required (origin base)")
 		return 1
 	}
 	if probeLogPath == "" {
-		fmt.Fprintln(os.Stderr, "error: -probe-log is required; the TTL is read from what reaches our server")
+		fmt.Fprintln(os.Stderr, "error: -serverLog is required; the TTL is read from what reaches our server")
 		return 1
 	}
 	// Any arm that judges the read by a per-page code needs the secret to produce
@@ -469,14 +383,14 @@ func runTTLMap(base string, provs []Caller, arms []ttlArm, replicates int, first
 	if !dry {
 		for _, a := range arms {
 			if a.Code != nil && secret == "" {
-				fmt.Fprintln(os.Stderr, "error: -page-code-secret (PROBE_PAGE_CODE_SECRET) is required for this run — the format pages carry per-page HMAC codes the runner must recompute")
+				fmt.Fprintln(os.Stderr, "error: -pageCodeSecret (PROBE_PAGE_CODE_SECRET) is required for this run — the format pages carry per-page HMAC codes the runner must recompute")
 				return 1
 			}
 		}
 	}
 	host := hostOfURL(base)
 	if host == "" {
-		fmt.Fprintf(os.Stderr, "error: -url %q has no host\n", base)
+		fmt.Fprintf(os.Stderr, "error: -siteUrl %q has no host\n", base)
 		return 1
 	}
 	runID := runNonce()

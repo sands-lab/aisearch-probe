@@ -184,7 +184,7 @@ func NewHandler(origin *url.URL, logger *Logger, filter string) *Handler {
 }
 
 // NewHandlerWithBackend logs requests and hands them to any backend — the
-// reverse proxy in Mode B, or the built-in static server in -serve mode.
+// reverse proxy in Mode B, or the built-in static server in -serveDir mode.
 func NewHandlerWithBackend(backend http.Handler, logger *Logger, filter string) *Handler {
 	return &Handler{rp: backend, logger: logger, filter: filter, out: os.Stdout}
 }

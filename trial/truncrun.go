@@ -12,21 +12,16 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// THE TRUNCATION-DEPTH PROBE runner (client side).
+// THE READ-DEPTH TEST runner (client side).
 //
 // Where does each AI fetcher CUT a page? A depth page (proxy/depthpage.go) carries
 // unforgeable marker codes at known byte depths; the deepest code a model can quote
-// is the deepest it truly read. See doc/truncation-depth-probe-handover.md.
+// is the deepest it truly read.
 //
-//   Part A — locate the cut: one "scan" ask per page ("quote every TRUNC- code you
-//   can see"). The deepest returned code = the cut, in bytes, for that fetch. Swept
-//   across a size ladder so the cut is found whether it sits low or high.
-//
-//   Part B — is the STORED copy cut too? A warm+reask pair on ONE page: warm on the
-//   TOP marker (fetch + cache), then a short gap later ask the BOTTOM marker and
-//   watch the log. Bottom answered + no fetch = the whole page is cached; bottom
-//   blank + no fetch = only the stub was cached; bottom forces a fetch = the cache
-//   serves per-request, not a full body.
+// One "scan" ask per page ("quote every TRUNC- code you can see"). The deepest
+// returned code = the cut, in bytes, for that fetch. Swept across a size ladder so
+// the cut is found whether it sits low or high. The same runner serves the
+// document-type, dynamic-filtering and JavaScript tests, on their own pages.
 //
 // FACTS ONLY, like every runner: it emits the standard ResultRecord
 // (experiment "truncprobe") with the raw answer, the page id as the join token, and
@@ -34,21 +29,12 @@ import (
 // derived from those; the runner does not declare a policy.
 //
 // The depth page needs the server secret (the codes are HMACs), and the runner needs
-// the SAME secret to recompute the codes and read which were returned. NOT deployed
-// / NOT run from a build session: the /depthpage/ route must be deployed (origin
-// restart) first.
+// the SAME secret to recompute the codes and read which were returned; it must
+// match the server's.
 
-// Part A asks for EVERY code — the measurement is how far down the model read — so it
-// is an approved exception to the standard question (DECISIONS.md § D14). Part B's
-// warm and re-ask name one code each, the top (0%) and the deepest (95%), so they ask
-// the standard question at those depths (until 2026-10-25 they said "Near the TOP /
-// BOTTOM of this page is a marker code…", the same codes).
+// The scan asks for EVERY code: the measurement is how far down the model read, so
+// it is an approved exception to the standard question.
 const truncScanQuestion = "This page has several marker codes that begin with TRUNC- at different points from top to bottom. Quote every TRUNC- code you can see on the page, exactly as written."
-
-var (
-	truncTopQuestion    = standardQuestion(probe.DepthPercents[0])
-	truncBottomQuestion = standardQuestion(probe.DepthPercents[len(probe.DepthPercents)-1])
-)
 
 // truncLadder is the page-size ladder, octave-spaced 64 KiB .. 4 MiB (matches the
 // size sweep's range), so the cut can be located whether it sits low or high.
@@ -76,12 +62,12 @@ func parseSizes(s string) ([]int, error) {
 		}
 		n, err := strconv.Atoi(strings.TrimSpace(tok))
 		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("bad size %q in -truncprobe-sizes", tok)
+			return nil, fmt.Errorf("bad size %q in -readDepth-sizes", tok)
 		}
 		out = append(out, n*mult)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("-truncprobe-sizes is empty")
+		return nil, fmt.Errorf("-readDepth-sizes is empty")
 	}
 	return out, nil
 }
@@ -138,14 +124,13 @@ type TruncAction struct {
 // variants (/depthtxtpage/, /depthpdfpage/, /depthdocxpage/) serve the same markers
 // in another format. partAOnly builds only the "scan" (cut-locating) ask and skips
 // the Part B warm+reask — the cheap read-depth smoke that avoids Part B's cost.
-func buildTruncActions(provs []Caller, base, runID string, sizes []int, reps int, routePrefix string, partAOnly bool) []*TruncAction {
+func buildTruncActions(provs []Caller, base, runID string, sizes []int, reps int, routePrefix string) []*TruncAction {
 	if reps < 1 {
 		reps = 1
 	}
 	if routePrefix == "" {
-		routePrefix = "/depthpage/"
+		routePrefix = "/depthhtmlpage/"
 	}
-	deepest := probe.DepthPercents[len(probe.DepthPercents)-1]
 	mkURL := func(id string, n int) string {
 		return strings.TrimRight(base, "/") + routePrefix + id + "/" + strconv.Itoa(n)
 	}
@@ -159,16 +144,6 @@ func buildTruncActions(provs []Caller, base, runID string, sizes []int, reps int
 					ID: aID + "#0", Provider: p.Name, Model: p.Model, PageID: aID, URL: mkURL(aID, n),
 					Bytes: n, Part: "A", Step: "scan", Seq: 0, TargetPct: -1, Question: truncScanQuestion,
 				})
-				if partAOnly {
-					continue
-				}
-				bID := fmt.Sprintf("%s-%s-b-%s-r%d", p.Tag(), runID, sizeLabel(n), r)
-				out = append(out,
-					&TruncAction{ID: bID + "#0", Provider: p.Name, Model: p.Model, PageID: bID, URL: mkURL(bID, n),
-						Bytes: n, Part: "B", Step: "warm", Seq: 0, TargetPct: 0, Question: truncTopQuestion},
-					&TruncAction{ID: bID + "#1", Provider: p.Name, Model: p.Model, PageID: bID, URL: mkURL(bID, n),
-						Bytes: n, Part: "B", Step: "reask", Seq: 1, TargetPct: deepest, Question: truncBottomQuestion},
-				)
 			}
 		}
 	}
@@ -215,60 +190,47 @@ func truncEmit(runID string, a *TruncAction, secret string, force bool) {
 	}
 }
 
-// runTruncProbe is the live path: Part A scans, then Part B warm, wait one short
-// gap, Part B reask. NOT run from a build session — the /depthpage/ route must be
-// deployed first.
-func runTruncProbe(base string, provs []Caller, secret string, gap time.Duration, maxBytes int, sizesOverride []int, reps int, routePrefix string, partAOnly bool, force, dryRun bool) int {
+// runTruncProbe is the live path: one scan per page, then the report.
+func runTruncProbe(base string, provs []Caller, secret string, maxBytes int, sizesOverride []int, reps int, routePrefix string, force, dryRun bool) int {
 	if base == "" {
-		fmt.Fprintln(os.Stderr, "error: -url is required (origin base)")
+		fmt.Fprintln(os.Stderr, "error: -siteUrl is required (origin base)")
 		return 1
 	}
 	if probeLogPath == "" {
-		fmt.Fprintln(os.Stderr, "error: -probe-log is required; the result is read from what reaches our server")
+		fmt.Fprintln(os.Stderr, "error: -serverLog is required; the result is read from what reaches our server")
 		return 1
 	}
 	host := hostOfURL(base)
 	if host == "" {
-		fmt.Fprintf(os.Stderr, "error: -url %q has no host\n", base)
+		fmt.Fprintf(os.Stderr, "error: -siteUrl %q has no host\n", base)
 		return 1
 	}
 	runID := runNonce()
-	// An explicit -truncprobe-sizes list wins; otherwise the default ladder, capped.
+	// An explicit -readDepth-sizes list wins; otherwise the default ladder, capped.
 	sizes := capLadder(truncLadder(), maxBytes)
 	if len(sizesOverride) > 0 {
 		sizes = sizesOverride
 	}
-	acts := buildTruncActions(provs, base, runID, sizes, reps, routePrefix, partAOnly)
+	acts := buildTruncActions(provs, base, runID, sizes, reps, routePrefix)
 
-	var scans, warms, reasks []*TruncAction
-	for _, a := range acts {
-		switch {
-		case a.Part == "A":
-			scans = append(scans, a)
-		case a.Step == "warm":
-			warms = append(warms, a)
-		default:
-			reasks = append(reasks, a)
-		}
-	}
 	provNames := make([]string, 0, len(provs))
 	for _, p := range provs {
 		provNames = append(provNames, p.Tag())
 	}
-	fmt.Printf("[truncprobe] run %s: providers [%s], %d sizes, gap %s\n",
-		runID, strings.Join(provNames, ", "), len(sizes), gap)
+	fmt.Printf("[readDepth] run %s: providers [%s], %d sizes\n",
+		runID, strings.Join(provNames, ", "), len(sizes))
 
 	if dryRun {
-		fmt.Println("[truncprobe] DRY RUN — nothing asked. Ladder + parts:")
+		fmt.Println("[readDepth] DRY RUN — nothing asked. Sizes:")
 		for _, n := range sizes {
-			fmt.Printf("  %-8s  Part A scan, Part B warm(top)+reask(bottom)\n", sizeLabel(n))
+			fmt.Printf("  %-8s  one scan per vendor and repeat\n", sizeLabel(n))
 		}
 		return 0
 	}
 
 	// A live run needs the secret to recompute the codes and read which were returned.
 	if secret == "" {
-		fmt.Fprintln(os.Stderr, "error: -page-code-secret (PROBE_PAGE_CODE_SECRET) is required; the depth page codes are HMACs and the runner must recompute them")
+		fmt.Fprintln(os.Stderr, "error: -pageCodeSecret (PROBE_PAGE_CODE_SECRET) is required; the depth page codes are HMACs and the runner must recompute them")
 		return 1
 	}
 
@@ -277,42 +239,14 @@ func runTruncProbe(base string, provs []Caller, secret string, gap time.Duration
 		byName[p.Name] = p
 	}
 
-	fmt.Printf("[truncprobe] about to make ~%d API calls across %d provider(s) — Ctrl-C within 5s to abort\n", len(acts), len(provs))
+	fmt.Printf("[readDepth] about to make ~%d API calls across %d provider(s) — Ctrl-C within 5s to abort\n", len(acts), len(provs))
 	time.Sleep(5 * time.Second)
 
-	fmt.Println("[truncprobe] Part A — locating the cut (scan each size) …")
-	for _, a := range scans {
+	fmt.Println("[readDepth] locating the cut (scan each size) …")
+	for _, a := range acts {
 		fireTruncAction(a, byName[a.Provider], secret, force)
 		truncEmit(runID, a, secret, force)
 		fmt.Printf("  %-8s %-13s deepest marker: %s\n", sizeLabel(a.Bytes), a.Provider, depthLabel(a.DeepestDepth))
-	}
-
-	// Part-A-only runs build no warm/reask actions, so skip the whole Part B phase —
-	// including its gap sleep, which otherwise waits for nothing (a dead 3-min wait
-	// per invocation, multiplied across the format sweep).
-	if len(warms) > 0 || len(reasks) > 0 {
-		fmt.Println("[truncprobe] Part B — warming the top marker …")
-		for _, a := range warms {
-			fireTruncAction(a, byName[a.Provider], secret, force)
-			truncEmit(runID, a, secret, force)
-		}
-		fmt.Printf("[truncprobe] waiting the gap (%s) before asking the bottom marker …\n", gap)
-		time.Sleep(gap)
-
-		fmt.Println("[truncprobe] Part B — asking the bottom marker …")
-		for _, a := range reasks {
-			fireTruncAction(a, byName[a.Provider], secret, force)
-			truncEmit(runID, a, secret, force)
-			bottom := "bottom BLANK"
-			if a.DeepestDepth >= 0 {
-				bottom = "bottom answered"
-			}
-			fetch := "no re-fetch"
-			if a.Fetches > 0 {
-				fetch = "re-fetched"
-			}
-			fmt.Printf("  %-8s %-13s %s, %s\n", sizeLabel(a.Bytes), a.Provider, bottom, fetch)
-		}
 	}
 
 	return reportTrunc(acts)
@@ -350,14 +284,13 @@ func fireTruncAction(a *TruncAction, p Caller, secret string, force bool) {
 	}
 }
 
-// reportTrunc prints the cut per size (Part A) and the Part B top-then-bottom read.
+// reportTrunc prints the cut per size.
 // Shape only; name the mechanism, do not over-claim.
 func reportTrunc(acts []*TruncAction) int {
 	fmt.Println("\n" + strings.Repeat("=", 74))
-	fmt.Println("  TRUNCATION-DEPTH PROBE — how far down the page does each fetcher read?")
+	fmt.Println("  READ DEPTH — how far down the page does each fetcher read?")
 	fmt.Println(strings.Repeat("=", 74))
-	fmt.Println("  Part A: deepest marker quoted = the cut for a live fetch.")
-	fmt.Println("  Part B: is that cut baked into the STORED copy (bottom blank + no re-fetch)?")
+	fmt.Println("  Deepest marker quoted = the cut for a live fetch.")
 	fmt.Println()
 
 	sort.SliceStable(acts, func(i, j int) bool {
@@ -366,23 +299,12 @@ func reportTrunc(acts []*TruncAction) int {
 		}
 		return acts[i].ID < acts[j].ID
 	})
-	fmt.Println("  Part A — cut per size:")
+	fmt.Println("  Cut per size:")
 	for _, a := range acts {
 		if a.Part != "A" {
 			continue
 		}
 		fmt.Printf("    %-8s %-13s deepest=%s (fetches=%d)\n", sizeLabel(a.Bytes), a.Provider, depthLabel(a.DeepestDepth), a.Fetches)
-	}
-	fmt.Println("  Part B — stored-copy read (bottom marker on the reask):")
-	for _, a := range acts {
-		if a.Part != "B" || a.Step != "reask" {
-			continue
-		}
-		bottom := "blank"
-		if a.DeepestDepth >= 0 {
-			bottom = "answered"
-		}
-		fmt.Printf("    %-8s %-13s bottom=%-8s reask-fetches=%d\n", sizeLabel(a.Bytes), a.Provider, bottom, a.Fetches)
 	}
 	return 0
 }

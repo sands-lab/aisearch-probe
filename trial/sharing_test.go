@@ -307,16 +307,16 @@ func TestValidateSharingPair(t *testing.T) {
 	a := Caller{Name: "or:openai", Model: "openai/gpt-5-mini"}
 	b := Caller{Name: "openai", Model: "gpt-5-mini"}
 	if validateSharingPair(a, a, "", "", false) == nil {
-		t.Error("identical callers without -sharing-baseline must be refused")
+		t.Error("identical callers without -sharingApi-run-sameCaller must be refused")
 	}
 	if err := validateSharingPair(a, a, "", "", true); err != nil {
 		t.Errorf("baseline with the same caller must pass: %v", err)
 	}
 	if validateSharingPair(a, b, "", "", true) == nil {
-		t.Error("-sharing-baseline with two different callers is a contradiction")
+		t.Error("-sharingApi-run-sameCaller with two different callers is a contradiction")
 	}
 	if validateSharingPair(a, a, "alice", "bob", true) == nil {
-		t.Error("-sharing-baseline with two different users is a contradiction")
+		t.Error("-sharingApi-run-sameCaller with two different users is a contradiction")
 	}
 	if err := validateSharingPair(a, b, "", "", false); err != nil {
 		t.Errorf("two different callers must pass: %v", err)
@@ -343,7 +343,7 @@ func TestSharingLockPathPerComparison(t *testing.T) {
 	}
 }
 
-// The pause before the control (-sharing-control-gap) moves only the control step;
+// The pause before the control (-sharingApi-controlAskGap) moves only the control step;
 // zero leaves the plan exactly as before. Added 2026-10-31: Gemini's free tier
 // answered 503 to the control, asked 20 s after step 2, in both of its tries.
 func TestWithControlGapMovesOnlyTheControl(t *testing.T) {

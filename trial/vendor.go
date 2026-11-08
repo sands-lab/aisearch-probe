@@ -29,7 +29,7 @@ import (
 )
 
 // rawOutPath is where every vendor reply is kept, whole, one JSON line per POST
-// (-raw-out; on by default, "" = off). Runners keep only the answer text and the
+// (-replyLog; on by default, "" = off). Runners keep only the answer text and the
 // token counts; everything else a vendor sends (Anthropic's per-fetch result and
 // error_code, OpenRouter's annotations, xAI's tool calls) is in here, for any
 // later analysis to take. Append-only, like every log.
@@ -195,6 +195,5 @@ var (
 	_ Vendor = anthropicVendor{}
 	_ Vendor = xaiVendor{}
 	_ Vendor = geminiVendor{}
-	_ Vendor = perplexityVendor{}
 	_ Vendor = openRouterVendor{}
 )

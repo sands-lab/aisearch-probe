@@ -72,7 +72,7 @@ func faultDepthID(token string) string {
 	return strings.TrimPrefix(token, "probe=")
 }
 
-// pickFaults is the -faults-only selection: a comma-separated list of fault
+// pickFaults is the -fault-kinds selection: a comma-separated list of fault
 // names, or "" for the usual battery. A battery name gives the battery's own
 // entry; "flaky/N" (any N >= 0) gives a recovery fault, so flaky/0 — a page that
 // works at once — can serve as the success baseline asked with the fault
@@ -102,7 +102,7 @@ func pickFaults(names string) ([]FaultSpec, error) {
 				continue
 			}
 		}
-		return nil, fmt.Errorf("-faults-only: unknown fault %q", n)
+		return nil, fmt.Errorf("-fault-kinds: unknown fault %q", n)
 	}
 	return out, nil
 }
@@ -147,24 +147,24 @@ func runFaults(base string, provs []Caller, faults []FaultSpec,
 	window time.Duration, force bool, outPath, runID, secret string) int {
 
 	if base == "" {
-		fmt.Fprintln(os.Stderr, "error: -url is required — the base address whose /fault/ paths are asked about")
+		fmt.Fprintln(os.Stderr, "error: -siteUrl is required — the base address whose /fault/ paths are asked about")
 		return 1
 	}
 	if probeLogPath == "" {
 		// The whole measurement is what arrives at our server; without the log
 		// there is nothing to read and the run would only spend money.
-		fmt.Fprintln(os.Stderr, "error: -probe-log is required; the retry count is read from it")
+		fmt.Fprintln(os.Stderr, "error: -serverLog is required; the retry count is read from it")
 		return 1
 	}
 	if secret == "" {
 		// The content-ending faults serve the depth page; its markers are HMACs,
 		// and the runner needs the same secret to read how deep the model got.
-		fmt.Fprintln(os.Stderr, "error: -page-code-secret (PROBE_PAGE_CODE_SECRET) is required; the fault pages carry depth markers the runner must recompute")
+		fmt.Fprintln(os.Stderr, "error: -pageCodeSecret (PROBE_PAGE_CODE_SECRET) is required; the fault pages carry depth markers the runner must recompute")
 		return 1
 	}
 	host := hostOfURL(base)
 	if host == "" {
-		fmt.Fprintf(os.Stderr, "error: -url %q has no host\n", base)
+		fmt.Fprintf(os.Stderr, "error: -siteUrl %q has no host\n", base)
 		return 1
 	}
 	// A fresh nonce per run, so this run's URLs collide with no previous run's

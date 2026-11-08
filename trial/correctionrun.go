@@ -737,15 +737,15 @@ func planCorrection(base, localOrigin string, provs []Caller, formats []string, 
 	statePath, secret, controlSecret string, dryRun bool) int {
 
 	if base == "" || hostOfURL(base) == "" {
-		fmt.Fprintln(os.Stderr, "error: -url must be the origin base, e.g. https://probe.example.org")
+		fmt.Fprintln(os.Stderr, "error: -siteUrl must be the origin base, e.g. https://probe.example.org")
 		return 1
 	}
 	if !dryRun && (secret == "" || controlSecret == "") {
-		fmt.Fprintln(os.Stderr, "error: needs -page-code-secret and -control-secret (both must match the origin)")
+		fmt.Fprintln(os.Stderr, "error: needs -pageCodeSecret and -controlSecret (both must match the origin)")
 		return 1
 	}
 	if settle <= 0 {
-		fmt.Fprintln(os.Stderr, "error: -correction-settle must be positive")
+		fmt.Fprintln(os.Stderr, "error: -correction-switchDelay must be positive")
 		return 1
 	}
 	var names []string
@@ -754,7 +754,7 @@ func planCorrection(base, localOrigin string, provs []Caller, formats []string, 
 	}
 	reask, err := parseReaskSpec(reaskSpec, names)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: -correction-reask: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: -correction-askAgainTimes: %v\n", err)
 		return 1
 	}
 	if !dryRun {
@@ -764,14 +764,14 @@ func planCorrection(base, localOrigin string, provs []Caller, formats []string, 
 		}
 	}
 	if warmGap < 0 {
-		fmt.Fprintln(os.Stderr, "error: -correction-warm-gap must not be negative")
+		fmt.Fprintln(os.Stderr, "error: -correction-firstAskGap must not be negative")
 		return 1
 	}
 	runID := runNonce()
 	now := time.Now().UTC()
 	start, err := parseStartAt(startAt, now)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: -correction-start-at: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: -correction-startAt: %v\n", err)
 		return 1
 	}
 	if start.After(now) {
@@ -825,7 +825,7 @@ func planCorrection(base, localOrigin string, provs []Caller, formats []string, 
 		fmt.Fprintf(os.Stderr, "error: cannot write state %s: %v\n", statePath, err)
 		return 1
 	}
-	fmt.Printf("[correction] state written to %s. Nothing has been asked yet; run -correction-loop (tmux) or -correction-tick (cron).\n", statePath)
+	fmt.Printf("[correction] state written to %s. Nothing has been asked yet; run -correction-loop (tmux) or -correction-step (cron).\n", statePath)
 	return 0
 }
 
@@ -847,7 +847,7 @@ func realCorrectionDeps(st *CorrectionState, provs []Caller, secret, controlSecr
 		ask: func(pg *CorrectionPage, question string) (string, probe.Usage, error) {
 			p, ok := byName[pg.Provider]
 			if !ok {
-				return "", probe.Usage{}, fmt.Errorf("provider %s not active (missing key or -only?)", pg.Provider)
+				return "", probe.Usage{}, fmt.Errorf("provider %s not active (missing key or -vendors?)", pg.Provider)
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
@@ -861,7 +861,7 @@ func realCorrectionDeps(st *CorrectionState, provs []Caller, secret, controlSecr
 // ticking every minute until every page is done or void (tmux).
 func runCorrectionTick(provs []Caller, statePath, secret, controlSecret string, loop bool) int {
 	if secret == "" || controlSecret == "" {
-		fmt.Fprintln(os.Stderr, "error: needs -page-code-secret and -control-secret (both must match the origin)")
+		fmt.Fprintln(os.Stderr, "error: needs -pageCodeSecret and -controlSecret (both must match the origin)")
 		return 1
 	}
 	lock, err := acquireRunLock(correctionLockFor(statePath), "correction run tick", []string{"changeable pages (/verhtmlpage/, /vertxtpage/) of " + statePath})
@@ -978,7 +978,7 @@ func reportCorrection(st *CorrectionState, recs []probe.Record) int {
 	return 0
 }
 
-// parseStartAt reads -correction-start-at: when a sitting's first warm-up slot
+// parseStartAt reads -correction-startAt: when a sitting's first warm-up slot
 // is. Empty = now. The time must carry an explicit zone (a bare "10:00" is
 // ambiguous between Riyadh and UTC), and a time in the past or more than 30 days
 // out is refused as a likely typo.

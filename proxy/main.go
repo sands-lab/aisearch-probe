@@ -11,8 +11,8 @@
 //
 // Usage:
 //
-//	./probe-proxy -origin http://localhost:8080 -port 8899
-//	./probe-proxy -origin http://localhost:8080 -port 8899 -filter /docs
+//	./probe-proxy -proxyTo http://localhost:8080 -port 8899
+//	./probe-proxy -proxyTo http://localhost:8080 -port 8899 -logOnlyPath /docs
 package main
 
 import (
@@ -26,22 +26,22 @@ import (
 )
 
 var (
-	originFlag       = flag.String("origin", "", "Origin URL to proxy to, e.g. http://localhost:8080 (required)")
+	originFlag       = flag.String("proxyTo", "", "Origin URL to proxy to, e.g. http://localhost:8080 (required)")
 	portFlag         = flag.Int("port", 8899, "Port this proxy listens on")
-	logFlag          = flag.String("log", "logs/probe.jsonl", "Path to the JSONL log file")
-	filterFlag       = flag.String("filter", "", "Only log requests whose path starts with this prefix (empty = log all)")
+	logFlag          = flag.String("logFile", "logs/probe.jsonl", "Path to the JSONL log file")
+	filterFlag       = flag.String("logOnlyPath", "", "Only log requests whose path starts with this prefix (empty = log all)")
 	quietFlag        = flag.Bool("quiet", false, "Suppress the live per-request console line")
-	noCheckFlag      = flag.Bool("no-selfcheck", false, "Skip the origin validator self-check on startup")
-	serveFlag        = flag.String("serve", "", "Serve pages from this directory instead of proxying (use instead of -origin)")
-	ccFlag           = flag.String("cache-control", "", "Cache-Control sent with the static probe-site/ pages (-serve mode only). Default: none, the normal page (DECISIONS.md § D13). Generated pages ignore it")
-	robotsSecretFlag = flag.String("robots-control-secret", os.Getenv("PROBE_CONTROL_SECRET"),
-		"Password for the page controls, POST /control/version and /control/heal (-serve mode only; empty = controls disabled)")
-	pageCodeSecretFlag = flag.String("page-code-secret", os.Getenv("PROBE_PAGE_CODE_SECRET"),
-		"Secret key for the unforgeable per-page codes on /cpage/ (-serve mode only; empty = /cpage/ route disabled)")
-	versionStateFlag = flag.String("version-state-file", "logs/verpage-state.json",
-		"File holding each changeable page's current version (/verhtmlpage/, /vertxtpage/), so a restart keeps it (-serve mode only; missing = empty start; \"\" = memory only)")
-	healStateFlag = flag.String("heal-state-file", "logs/heal-state.json",
-		"File holding each healable page's state (/healpage/: broken with which failure, or fixed and when), so a restart keeps it (-serve mode only; missing = empty start; \"\" = memory only)")
+	noCheckFlag      = flag.Bool("skipSelfCheck", false, "Skip the origin validator self-check on startup")
+	serveFlag        = flag.String("serveDir", "", "Serve pages from this directory instead of proxying (use instead of -proxyTo)")
+	ccFlag           = flag.String("cacheControl", "", "Cache-Control sent with the static probe-site/ pages (-serveDir mode only). Default: none, the normal page (DECISIONS.md § D13). Generated pages ignore it")
+	robotsSecretFlag = flag.String("controlSecret", os.Getenv("PROBE_CONTROL_SECRET"),
+		"Password for the page controls, POST /control/version and /control/heal (-serveDir mode only; empty = controls disabled)")
+	pageCodeSecretFlag = flag.String("pageCodeSecret", os.Getenv("PROBE_PAGE_CODE_SECRET"),
+		"Secret key for the unforgeable per-page codes on /cpage/ (-serveDir mode only; empty = /cpage/ route disabled)")
+	versionStateFlag = flag.String("correction-serverStateFile", "logs/verpage-state.json",
+		"File holding each changeable page's current version (/verhtmlpage/, /vertxtpage/), so a restart keeps it (-serveDir mode only; missing = empty start; \"\" = memory only)")
+	healStateFlag = flag.String("heal-serverStateFile", "logs/heal-state.json",
+		"File holding each healable page's state (/healpage/: broken with which failure, or fixed and when), so a restart keeps it (-serveDir mode only; missing = empty start; \"\" = memory only)")
 )
 
 func newStderrLogger() *log.Logger { return log.New(os.Stderr, "[upstream] ", 0) }
@@ -82,7 +82,7 @@ func main() {
 	flag.Parse()
 
 	if (*originFlag == "") == (*serveFlag == "") {
-		fmt.Fprintln(os.Stderr, "error: give exactly one of -origin (proxy an existing site) or -serve (serve a directory)")
+		fmt.Fprintln(os.Stderr, "error: give exactly one of -proxyTo (proxy an existing site) or -serveDir (serve a directory)")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -99,7 +99,7 @@ func main() {
 	if *serveFlag != "" {
 		dirInfo, err := os.Stat(*serveFlag)
 		if err != nil || !dirInfo.IsDir() {
-			log.Fatalf("-serve %q is not a directory", *serveFlag)
+			log.Fatalf("-serveDir %q is not a directory", *serveFlag)
 		}
 		st := newStaticServer(*serveFlag, *ccFlag)
 		st.controlSecret = *robotsSecretFlag
@@ -134,7 +134,7 @@ func main() {
 	} else {
 		originURL, err := url.Parse(*originFlag)
 		if err != nil || originURL.Scheme == "" || originURL.Host == "" {
-			log.Fatalf("invalid -origin URL %q (want e.g. http://localhost:8080)", *originFlag)
+			log.Fatalf("invalid -proxyTo URL %q (want e.g. http://localhost:8080)", *originFlag)
 		}
 		handler = NewHandler(originURL, logger, *filterFlag)
 		if !*noCheckFlag {

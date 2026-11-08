@@ -132,7 +132,7 @@ func (s *staticServer) faultSecretMissing(w http.ResponseWriter) bool {
 		return false
 	}
 	http.Error(w, "fault: this fault serves a depth page and needs the page-code secret "+
-		"(-page-code-secret); refusing rather than serving a page without markers",
+		"(-pageCodeSecret); refusing rather than serving a page without markers",
 		http.StatusInternalServerError)
 	return true
 }

@@ -172,15 +172,43 @@ func nearest(want string, have []string) []string {
 
 // runCheck exercises each provider end to end against a real URL, so the check
 // covers the tunnel and the page as well as the API.
-// probeLogPath is set by -probe-log so the check can see who actually fetched.
+// probeLogPath is set by -serverLog so the check can see who actually fetched.
 var probeLogPath string
 
 // checkCache skips re-validating a route that passed recently. Preflight only —
 // never the trials. See routecache.go for why that line matters.
 var checkCache *routeCache
 
-func runCheck(provs []Caller, url, marker string, force bool) bool {
-	fmt.Printf("Checking providers against %s\n\n", url)
+// checkPageSize is the size of the fresh depth page the checks ask about.
+const checkPageSize = 2048
+
+// checkPageURL is a fresh 2 KB depth page on base for one check.
+func checkPageURL(base, id string) string {
+	return strings.TrimRight(base, "/") + "/depthhtmlpage/" + id + "/" + fmt.Sprint(checkPageSize)
+}
+
+// checkPageTarget is the page -checkPage downloads and the code its top must
+// carry. It needs the site address and the page-code secret.
+func checkPageTarget(base, secret string) (pageURL, code string, err error) {
+	if base == "" {
+		return "", "", fmt.Errorf("-checkPage needs -siteUrl")
+	}
+	if secret == "" {
+		return "", "", fmt.Errorf("-checkPage needs -pageCodeSecret (or PROBE_PAGE_CODE_SECRET)")
+	}
+	id := "check-" + runNonce()
+	return checkPageURL(base, id), probe.DepthCode(secret, id, probe.DepthPercents[0], probe.DepthPageRevision), nil
+}
+
+// runCheck asks every vendor route about its own fresh depth page on base and
+// reports whether the answer quoted one of that page's codes.
+func runCheck(provs []Caller, base, secret string, force bool) bool {
+	if secret == "" {
+		fmt.Fprintln(os.Stderr, "error: -checkVendors needs -pageCodeSecret (or PROBE_PAGE_CODE_SECRET): it asks about a depth page and checks its codes")
+		return false
+	}
+	nonce := runNonce()
+	fmt.Printf("Checking providers against fresh depth pages on %s\n\n", base)
 
 	// If an OpenRouter key is in play, report what it has left. A run that dies
 	// part-way because credit ran out is not a partial result, it is a void one.
@@ -257,7 +285,8 @@ func runCheck(provs []Caller, url, marker string, force bool) bool {
 		// fetch and the check reports a failure that is really our own doing.
 		// The probe strips the query when deriving page_key, so logging and
 		// analysis are unaffected.
-		probeURL, token := probeURLFor(url, p.Tag())
+		pageID := "check-" + nonce + "-" + safeName(p.Tag())
+		probeURL, token := probeURLFor(checkPageURL(base, pageID), p.Tag())
 
 		start := time.Now()
 		startUnix := float64(start.UnixNano()) / 1e9
@@ -270,7 +299,7 @@ func runCheck(provs []Caller, url, marker string, force bool) bool {
 			r.CallErr = err.Error()
 		} else {
 			r.CallOK = true
-			r.Fetched = containsFold(answer, marker)
+			r.Fetched = probe.DeepestDepth(answer, secret, pageID, probe.DepthPageRevision) >= 0
 		}
 
 		// The API response cannot say WHO fetched. The server log can, and this

@@ -549,7 +549,7 @@ func reportHeal(st *HealState, recs []probe.Record, secret string) int {
 	return 0
 }
 
-// HealResultRow is one page's result as written by -heal-report-json, for plotting.
+// HealResultRow is one page's result as written by -heal-reportFile, for plotting.
 // It carries the same reading as the printed report (healOutcome): the plot never
 // re-derives the rules and never needs the page-code secret.
 type HealResultRow struct {
@@ -676,25 +676,25 @@ type healPlanArgs struct {
 // planHeal writes the state file. It calls no API and touches no page.
 func planHeal(a healPlanArgs) int {
 	if a.Base == "" || hostOfURL(a.Base) == "" {
-		fmt.Fprintln(os.Stderr, "error: -url must be the origin base, e.g. https://probe.example.org")
+		fmt.Fprintln(os.Stderr, "error: -siteUrl must be the origin base, e.g. https://probe.example.org")
 		return 1
 	}
 	if !a.DryRun && (a.Secret == "" || a.ControlSecret == "") {
-		fmt.Fprintln(os.Stderr, "error: needs -page-code-secret and -control-secret (both must match the origin)")
+		fmt.Fprintln(os.Stderr, "error: needs -pageCodeSecret and -controlSecret (both must match the origin)")
 		return 1
 	}
 	if a.Settle <= 0 || a.WarmGap < 0 {
-		fmt.Fprintln(os.Stderr, "error: -heal-settle must be positive and -heal-warm-gap not negative")
+		fmt.Fprintln(os.Stderr, "error: -heal-fixDelay must be positive and -heal-firstAskGap not negative")
 		return 1
 	}
 	checks, err := parseHealChecks(a.Checks)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: -heal-checks: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: -heal-askAgainTimes: %v\n", err)
 		return 1
 	}
 	fails, err := parseHealFails(a.Fails)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: -heal-fails: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: -heal-failCodes: %v\n", err)
 		return 1
 	}
 	if !a.DryRun {
@@ -706,7 +706,7 @@ func planHeal(a healPlanArgs) int {
 	now := time.Now().UTC()
 	start, err := parseStartAt(a.StartAt, now)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: -heal-start-at: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error: -heal-startAt: %v\n", err)
 		return 1
 	}
 	runID := runNonce()
@@ -760,7 +760,7 @@ func planHeal(a healPlanArgs) int {
 // runHealTick fires what is due once, or with loop=true every minute until done.
 func runHealTick(provs []Caller, statePath, secret, controlSecret string, loop bool) int {
 	if secret == "" || controlSecret == "" {
-		fmt.Fprintln(os.Stderr, "error: needs -page-code-secret and -control-secret (both must match the origin)")
+		fmt.Fprintln(os.Stderr, "error: needs -pageCodeSecret and -controlSecret (both must match the origin)")
 		return 1
 	}
 	lock, err := acquireRunLock(healLockFor(statePath), "remembered-failure run tick", []string{"healable pages (/healpage/) of " + statePath})

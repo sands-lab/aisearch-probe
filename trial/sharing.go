@@ -26,7 +26,7 @@ import (
 // paying customers, clean only where both routes bring the vendor's OWN fetcher;
 // verified 2026-10-11 for OpenAI, Anthropic on claude-sonnet-5, and xAI), by model
 // at one vendor (address by Tag), by OpenRouter end-user id, or not at all
-// (-sharing-baseline: the same caller twice, the within-account reference).
+// (-sharingApi-run-sameCaller: the same caller twice, the within-account reference).
 //
 // THE PAGE AND THE PROOF (redo of 2026-10-11)
 //
@@ -183,12 +183,12 @@ func validateSharingPair(a, b Caller, userA, userB string, baseline bool) error 
 	same := a.Tag() == b.Tag() && userA == userB
 	switch {
 	case baseline && !same:
-		return errors.New("-sharing-baseline means the SAME caller twice; drop it to compare two different callers")
+		return errors.New("-sharingApi-run-sameCaller means the SAME caller twice; drop it to compare two different callers")
 	case !baseline && same:
 		return errors.New("the two callers are identical. Differ by at least one of: a different account\n" +
 			"  (direct key vs or:vendor), a different MODEL at one vendor (address by Tag, e.g.\n" +
-			"  or:openai-gpt-5-mini), or different -sharing-first-user/-sharing-second-user —\n" +
-			"  or pass -sharing-baseline for the within-account reference")
+			"  or:openai-gpt-5-mini), or different -sharingApi-firstUser/-sharing-second-user —\n" +
+			"  or pass -sharingApi-run-sameCaller for the within-account reference")
 	}
 	return nil
 }
@@ -233,11 +233,11 @@ func runSharing(base, secret string, first, second Caller,
 		fmt.Printf("  PER-USER MODE: first caller user=%q, second caller user=%q (sent via OpenRouter's user field)\n\n", firstUser, secondUser)
 	}
 	if base == "" {
-		fmt.Fprintln(os.Stderr, "error: -url (the origin, e.g. https://probe.attentionhub.org) is required")
+		fmt.Fprintln(os.Stderr, "error: -siteUrl (the origin, e.g. https://probe.attentionhub.org) is required")
 		return 1
 	}
 	if secret == "" && !dryRun {
-		fmt.Fprintln(os.Stderr, "error: -page-code-secret (or $PROBE_PAGE_CODE_SECRET) is required:")
+		fmt.Fprintln(os.Stderr, "error: -pageCodeSecret (or $PROBE_PAGE_CODE_SECRET) is required:")
 		fmt.Fprintln(os.Stderr, "  every answer is matched against the page's own code, recomputed from it")
 		return 1
 	}
@@ -279,7 +279,7 @@ func runSharing(base, secret string, first, second Caller,
 		// a download happened, which is the entire measurement — so the run could
 		// only ever produce answers and no result. It warned instead, once, and
 		// spent two API calls proving that.
-		fmt.Fprintln(os.Stderr, "error: -probe-log is required for the sharing experiment.")
+		fmt.Fprintln(os.Stderr, "error: -serverLog is required for the sharing experiment.")
 		fmt.Fprintln(os.Stderr, "  Without the server log nothing can be observed: the measurement IS")
 		fmt.Fprintln(os.Stderr, "  whether a download arrived, so the run would spend money for nothing.")
 		return 1
@@ -470,7 +470,7 @@ const sharingFetchWindow = 150.0
 // Shared by the API run and the web-app run so both judge a download alike.
 func observeFetches(st *SharingStep, provider string, window float64) {
 	if probeLogPath == "" {
-		st.Attrib = "not checked (no -probe-log)"
+		st.Attrib = "not checked (no -serverLog)"
 		return
 	}
 	recs, _, lerr := probe.LoadRecords(probeLogPath, "", time.Time{})

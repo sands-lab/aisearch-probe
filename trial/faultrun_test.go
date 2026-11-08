@@ -299,7 +299,7 @@ func TestFaultPreflightChecksTheServerSecret(t *testing.T) {
 	}
 }
 
-// -faults-only picks a subset of the battery by name. Empty means the usual
+// -fault-kinds picks a subset of the battery by name. Empty means the usual
 // battery; "flaky/N" is allowed for any N (flaky/0 = a page that works at once,
 // the success baseline); anything else unknown is an error, so a typo can never
 // run something unexpected.

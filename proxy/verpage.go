@@ -40,7 +40,7 @@ import (
 // the page carries the time its current version was set. It still sends no
 // Cache-Control and no Expires (the D13 normal page).
 //
-// THE STATE IS SAVED TO A FILE (-version-state-file) and read back at start-up,
+// THE STATE IS SAVED TO A FILE (-correction-serverStateFile) and read back at start-up,
 // so an origin restart mid-run does not turn every version-2 page back into a 404.
 // No file is an empty start, which is how an origin that never used this page has
 // always started; a file that cannot be read is a start-up error, never a silent

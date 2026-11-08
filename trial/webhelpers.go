@@ -50,7 +50,7 @@ type webRawRecord struct {
 	// Notes is a free-text hook for anything unexpected the person saw.
 	Notes string `json:"notes,omitempty"`
 
-	// AnsweredUnix: when the reply was pasted back (-websharing only). Requests
+	// AnsweredUnix: when the reply was pasted back (-sharingWeb-run only). Requests
 	// after it cannot have produced the answer.
 	AnsweredUnix float64 `json:"answered_unix,omitempty"`
 }

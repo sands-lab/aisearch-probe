@@ -85,7 +85,7 @@ func TestGoogleRoutesAreSeparateAndUseTheirOwnCredentials(t *testing.T) {
 
 	// A key alone enables the Developer API route, not the Vertex one.
 	t.Setenv("GEMINI_API_KEY", "k")
-	ps := callers("m", "m", "m", "m", "m", nil)
+	ps := callers("m", "m", "m", "m", nil)
 	if g := find(ps, "google"); g == nil || !g.Enabled {
 		t.Error("google (Developer API) should be enabled by GEMINI_API_KEY alone")
 	} else if g.EnvKey != "GEMINI_API_KEY" {
@@ -105,7 +105,7 @@ func TestGoogleVertexRequiresReadableCredentialsFile(t *testing.T) {
 	}
 
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/definitely/not/here.json")
-	for _, p := range callers("m", "m", "m", "m", "m", nil) {
+	for _, p := range callers("m", "m", "m", "m", nil) {
 		if p.Name == "google-vertex" && p.Enabled {
 			t.Error("google-vertex enabled despite an unreadable credentials file")
 		}
@@ -117,7 +117,7 @@ func TestGoogleVertexRequiresReadableCredentialsFile(t *testing.T) {
 	}
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", f)
 	found := false
-	for _, p := range callers("m", "m", "m", "m", "m", nil) {
+	for _, p := range callers("m", "m", "m", "m", nil) {
 		if p.Name == "google-vertex" {
 			found = true
 			if !p.Enabled {
@@ -356,7 +356,7 @@ func TestGeminiKeySupersedesVertex(t *testing.T) {
 	t.Setenv("GEMINI_API_KEY", "k")
 
 	var enabled []string
-	for _, p := range callers("m", "m", "m", "m", "m", nil) {
+	for _, p := range callers("m", "m", "m", "m", nil) {
 		if p.Enabled {
 			enabled = append(enabled, p.Name)
 		}
@@ -379,7 +379,7 @@ func TestGeminiKeySupersedesVertex(t *testing.T) {
 	// Without a key, Vertex is the fallback and must still work.
 	t.Setenv("GEMINI_API_KEY", "")
 	fallback := false
-	for _, p := range callers("m", "m", "m", "m", "m", nil) {
+	for _, p := range callers("m", "m", "m", "m", nil) {
 		if p.Name == "google-vertex" && p.Enabled {
 			fallback = true
 		}
@@ -499,64 +499,17 @@ func TestGeminiSuccessAndMissingMetadataBothParse(t *testing.T) {
 	}
 }
 
-// PROJECT DECISION, 2026-08-31, enforced here so it survives being forgotten:
-// Google must not run against a tunnel hostname. Google's own docs exclude
-// tunneling services from url_context, and the failure mode is a plausible-looking
-// lie — its fetcher takes the page with HTTP 200 while the model says the URL is
-// blocked, which analyses as "Google fetched every round and never cached".
-func TestGoogleIsParkedOnTunnelHostnames(t *testing.T) {
-	t.Setenv("GEMINI_API_KEY", "not-a-real-key")
-	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
-
-	tunnels := []string{
-		"https://iii-conflicts-switches-dose.trycloudflare.com/method.html",
-		"https://abc.ngrok-free.app/method.html",
-		"http://localhost:8080/method.html",
-		"http://192.168.1.10/method.html",
+// Google is never turned off for its address; instead every run with a Google
+// route prints the tunnel warning, and a run without one does not.
+func TestGoogleWarningOnlyWhenGoogleRuns(t *testing.T) {
+	if !warnGoogle([]Caller{{Name: "openai"}, {Name: "google"}}) {
+		t.Error("a run with Google must print the tunnel warning")
 	}
-	for _, u := range tunnels {
-		ps := callers("m", "m", "m", "m", "m", nil)
-		if parkGoogle(ps, u) == 0 {
-			t.Errorf("%s: Google was left enabled on a tunnel hostname", u)
-		}
-		for _, p := range ps {
-			if strings.HasPrefix(p.Name, "google") && p.Enabled {
-				t.Errorf("%s: %s still enabled after parkGoogle", u, p.Name)
-			}
-		}
+	if !warnGoogle([]Caller{{Name: "google-vertex"}}) {
+		t.Error("the Vertex route is Google too and must print the warning")
 	}
-
-	// A real hostname must un-park it automatically. The point of checking the
-	// URL rather than keeping a flag is that Google returns without anyone
-	// having to remember to switch it back on.
-	ps := callers("m", "m", "m", "m", "m", nil)
-	real := "https://probe.sands.kaust.edu.sa/method.html"
-	if n := parkGoogle(ps, real); n != 0 {
-		t.Fatalf("Google was parked on a real hostname %q", real)
-	}
-	found := false
-	for _, p := range ps {
-		if p.Name == "google" {
-			found = true
-			if !p.Enabled {
-				t.Error("google should be enabled on a real hostname")
-			}
-		}
-	}
-	if !found {
-		t.Fatal("no google provider in the list")
-	}
-}
-
-// The override exists for one experiment (a named tunnel on a real domain) and
-// must be explicit.
-func TestTunnelOverrideIsRespected(t *testing.T) {
-	t.Setenv("GEMINI_API_KEY", "not-a-real-key")
-	allowGoogleOnTunnel = true
-	defer func() { allowGoogleOnTunnel = false }()
-	ps := callers("m", "m", "m", "m", "m", nil)
-	if parkGoogle(ps, "https://x.trycloudflare.com/p.html") != 0 {
-		t.Error("-allow-tunnel-google should keep Google enabled")
+	if warnGoogle([]Caller{{Name: "openai"}, {Name: "or:x-ai"}}) {
+		t.Error("a run without Google must not print the warning")
 	}
 }
 
@@ -699,7 +652,7 @@ func TestDryRunBackstopRefusesEveryProviderCall(t *testing.T) {
 
 // POLICY (BULLETIN 2026-10-11): every Anthropic call uses Sonnet 5. Haiku cannot
 // fetch a page (direct: nothing; OpenRouter: its own fetcher answers instead), so it
-// must never be what a run gets by leaving -anthropic-model unset.
+// must never be what a run gets by leaving -anthropicModel unset.
 func TestDefaultAnthropicModelIsSonnet(t *testing.T) {
 	if defaultAnthropicModel != "claude-sonnet-5" {
 		t.Errorf("default Anthropic model = %q, want claude-sonnet-5", defaultAnthropicModel)

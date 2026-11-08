@@ -13,7 +13,7 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// THE WEB-APP SHARING RUN (-websharing).
+// THE WEB-APP SHARING RUN (-sharingWeb-run).
 //
 // The API sharing test (sharing.go) for the consumer chat apps, where a person is
 // the browser. Same question: does a page one ACCOUNT's chat downloaded get served
@@ -136,7 +136,7 @@ func webSharingPrompt(s sharingPlanStep) string {
 
 func validateWebAccounts(a, b string) error {
 	if a == "" || b == "" {
-		return errors.New("name both accounts (-websharing-a, -websharing-b)")
+		return errors.New("name both accounts (-sharingWeb-firstAccount, -sharingWeb-secondAccount)")
 	}
 	if a == b {
 		return errors.New("the two accounts must be different logins; one account twice is not a two-account test")
@@ -159,7 +159,7 @@ func parseWebApps(s string) ([]string, error) {
 		apps = append(apps, a)
 	}
 	if len(apps) == 0 {
-		return nil, errors.New("no apps given (-websharing-apps)")
+		return nil, errors.New("no apps given (-sharingWeb-apps)")
 	}
 	return apps, nil
 }

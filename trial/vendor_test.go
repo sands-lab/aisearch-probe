@@ -93,7 +93,6 @@ func TestVendorEndpoints(t *testing.T) {
 		{"openai", openaiVendor{}, "gpt-5-mini", "https://api.openai.com/v1/responses"},
 		{"anthropic", anthropicVendor{}, "claude-sonnet-5", "https://api.anthropic.com/v1/messages"},
 		{"xai", xaiVendor{}, "grok-4.3", "https://api.x.ai/v1/responses"},
-		{"perplexity", perplexityVendor{}, "sonar", "https://api.perplexity.ai/v1/agent"},
 		{"openrouter", openRouterVendor{tool: "openrouter:web_search"}, "openai/gpt-5-mini", "https://openrouter.ai/api/v1/chat/completions"},
 		// Gemini is the one that folds the model into the URL.
 		{"gemini", geminiVendor{}, "gemini-2.5-flash", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"},
@@ -114,7 +113,7 @@ func TestVendorAuthHeaders(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		v    Vendor
-	}{{"openai", openaiVendor{}}, {"xai", xaiVendor{}}, {"perplexity", perplexityVendor{}}} {
+	}{{"openai", openaiVendor{}}, {"xai", xaiVendor{}}} {
 		t.Run(tc.name, func(t *testing.T) {
 			h, err := tc.v.Auth(ctx, "KEY")
 			if err != nil {
@@ -296,28 +295,6 @@ func TestAnthropicBuildRequest(t *testing.T) {
 	})
 }
 
-func TestPerplexityBuildRequest(t *testing.T) {
-	withGlobals(func() {
-		v := perplexityVendor{}
-
-		m := asMap(t, mustBuild(t, v, "sonar", "https://ex/p", "q", true))
-		assertNormalPrompt(t, m["input"].(string), "https://ex/p", "q")
-		if typ, ok := firstToolType(t, m); !ok || typ != "fetch_url" {
-			t.Errorf("tool = %q present=%v, want fetch_url", typ, ok)
-		}
-		// Perplexity forces the fetch via an instructions string, not tool_choice.
-		if s, _ := m["instructions"].(string); s == "" {
-			t.Error("forced perplexity must carry an instructions string telling it to fetch")
-		}
-
-		blindNoTools = true
-		m = asMap(t, mustBuild(t, v, "sonar", "https://ex/p", "q", true))
-		if _, ok := m["tools"]; ok {
-			t.Error("blindNoTools must omit the tools key")
-		}
-	})
-}
-
 func TestGeminiBuildRequest(t *testing.T) {
 	withGlobals(func() {
 		m := asMap(t, mustBuild(t, geminiVendor{}, "gemini-2.5-flash", "https://ex/p", "q", true))
@@ -436,13 +413,6 @@ func TestParseResponseAnswerAndUsage(t *testing.T) {
 			wantUsage: probe.Usage{InputTokens: 12, OutputTokens: 4},
 		},
 		{
-			name:      "perplexity choices + chat usage",
-			v:         perplexityVendor{},
-			raw:       `{"choices":[{"message":{"content":"pplx answer"}}],"usage":{"prompt_tokens":8,"completion_tokens":2}}`,
-			wantText:  "pplx answer",
-			wantUsage: probe.Usage{InputTokens: 8, OutputTokens: 2},
-		},
-		{
 			name:      "openrouter choices + chat usage",
 			v:         openRouterVendor{tool: "openrouter:web_search"},
 			raw:       `{"choices":[{"message":{"content":"or answer"}}],"usage":{"prompt_tokens":30,"completion_tokens":6}}`,
@@ -483,7 +453,6 @@ func TestParseResponseSurfacesFailures(t *testing.T) {
 		},
 		{"gemini no candidates", geminiVendor{}, `{"candidates":[]}`},
 		{"xai error object in body", xaiVendor{}, `{"error":{"message":"bad model"}}`},
-		{"perplexity error object", perplexityVendor{}, `{"error":{"message":"nope"}}`},
 		{"openrouter error object in a 200", openRouterVendor{tool: "openrouter:web_search"}, `{"error":{"message":"upstream failed"}}`},
 		{"openrouter no choices", openRouterVendor{tool: "openrouter:web_search"}, `{"choices":[]}`},
 		{"anthropic refusal", anthropicVendor{}, `{"content":[],"stop_reason":"refusal"}`},
@@ -524,7 +493,6 @@ func TestContinueNilForNonPausingVendors(t *testing.T) {
 		{"openai", openaiVendor{}},
 		{"xai", xaiVendor{}},
 		{"gemini", geminiVendor{}},
-		{"perplexity", perplexityVendor{}},
 		{"openrouter", openRouterVendor{tool: "openrouter:web_search"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -605,7 +573,7 @@ func TestAskVendorSingleTurn(t *testing.T) {
 	}
 }
 
-// Every reply is kept whole (-raw-out): one line per POST with the vendor address,
+// Every reply is kept whole (-replyLog): one line per POST with the vendor address,
 // model, page and round; a failed POST is kept too; the key never reaches the file.
 func TestAskVendorKeepsRawReplies(t *testing.T) {
 	old := rawOutPath

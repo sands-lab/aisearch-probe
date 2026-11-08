@@ -163,11 +163,6 @@ func projectFromCredentials(credPath string) string {
 
 var vertexRegion = "global"
 
-// googleAlsoSearch adds googleSearch alongside urlContext. Off by default: a
-// search tool can satisfy the question from an index snapshot without ever
-// fetching, which would make "no request arrived" ambiguous.
-var googleAlsoSearch = false
-
 func vertexEndpoint(project, region, model string) string {
 	host := "aiplatform.googleapis.com"
 	if region != "global" {
@@ -216,10 +211,9 @@ func askGoogle(ctx context.Context, credPath, model, pageURL, question string, f
 // the Gemini Developer API (plain key). Same request shape, different endpoint
 // and auth.
 func geminiBody(pageURL, question string) map[string]any {
+	// urlContext only. A search tool could answer from an index snapshot without
+	// fetching, which would make "no request arrived" ambiguous.
 	tools := []map[string]any{{"urlContext": map[string]any{}}}
-	if googleAlsoSearch {
-		tools = append(tools, map[string]any{"googleSearch": map[string]any{}})
-	}
 	return map[string]any{
 		"contents": []map[string]any{{
 			"role": "user",

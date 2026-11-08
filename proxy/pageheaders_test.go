@@ -178,13 +178,13 @@ func TestOnlyTheCacheTestRouteChoosesCacheHeaders(t *testing.T) {
 }
 
 // The static probe-site/ pages (index.html, method.html, staleness.html, …) get the
-// -cache-control flag. Its default must be "send none" — the same normal page.
+// -cacheControl flag. Its default must be "send none" — the same normal page.
 func TestStaticCacheControlDefaultsToNone(t *testing.T) {
-	f := flag.Lookup("cache-control")
+	f := flag.Lookup("cacheControl")
 	if f == nil {
-		t.Fatal("no -cache-control flag")
+		t.Fatal("no -cacheControl flag")
 	}
 	if f.DefValue != "" {
-		t.Errorf("-cache-control defaults to %q, want \"\" (send no Cache-Control)", f.DefValue)
+		t.Errorf("-cacheControl defaults to %q, want \"\" (send no Cache-Control)", f.DefValue)
 	}
 }

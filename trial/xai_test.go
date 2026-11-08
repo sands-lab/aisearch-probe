@@ -20,7 +20,7 @@ func clearProviderEnv(t *testing.T) {
 }
 
 // The direct xAI provider must be a first-class account, distinct from the
-// OpenRouter x-ai route: its Name is exactly "x-ai" so -sharing-first x-ai
+// OpenRouter x-ai route: its Name is exactly "x-ai" so -sharingApi-firstCaller x-ai
 // resolves, and Tag() carries the model so it never shares a stored copy with
 // the OpenRouter route in the sharing test.
 func TestXAIProviderRegistration(t *testing.T) {
@@ -36,7 +36,7 @@ func TestXAIProviderRegistration(t *testing.T) {
 	}
 
 	// Without the key, x-ai is not in the active set.
-	if p := find(callers("m", "m", "m", "m", "grok-4.3", nil), "x-ai"); p == nil {
+	if p := find(callers("m", "m", "m", "grok-4.3", nil), "x-ai"); p == nil {
 		t.Fatal("x-ai provider missing from the list entirely")
 	} else if p.Enabled {
 		t.Error("x-ai must be disabled without XAI_API_KEY")
@@ -44,7 +44,7 @@ func TestXAIProviderRegistration(t *testing.T) {
 
 	// With the key, it is enabled and reads its own credential.
 	t.Setenv("XAI_API_KEY", "k")
-	p := find(callers("m", "m", "m", "m", "grok-4.3", nil), "x-ai")
+	p := find(callers("m", "m", "m", "grok-4.3", nil), "x-ai")
 	if p == nil || !p.Enabled {
 		t.Fatal("x-ai should be enabled when XAI_API_KEY is set")
 	}
@@ -52,7 +52,7 @@ func TestXAIProviderRegistration(t *testing.T) {
 		t.Errorf("x-ai reads %q, want XAI_API_KEY", p.EnvKey)
 	}
 	if p.Model != "grok-4.3" {
-		t.Errorf("x-ai model = %q, want the -xai-model value grok-4.3", p.Model)
+		t.Errorf("x-ai model = %q, want the -xaiModel value grok-4.3", p.Model)
 	}
 	if p.Ask == nil {
 		t.Error("x-ai has no Ask function wired")

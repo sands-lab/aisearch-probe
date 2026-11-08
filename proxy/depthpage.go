@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"fmt"
-	"net/http"
 
 	"aisearch-probe/internal/probe"
 )
@@ -40,20 +39,6 @@ const depthPagePrefix = "/depthpage/"
 // maxDepthPageBytes caps what the origin will build on request. The ladder tops out
 // at 4 MiB; 16 MiB is headroom for a higher second pass and still bounded.
 const maxDepthPageBytes = 16 << 20
-
-// depthPageRoute is the /depthpage/ route. It needs the secret (the markers are
-// HMACs), so the shared spine 503s without one. See genpage.go.
-//
-// Deprecated: /depthpage/ uses the byte-exact force-replacement generator
-// (renderDepthPage), which can split a marker mid-word. New object-type and
-// read-window work should use the clean line-based routes in depthformats.go
-// (/depthtxtpage/, /depthpdfpage/, /depthdocxpage/, /depthctpage/). This route and
-// its generator are kept UNCHANGED for Result-16 and retention comparability — do
-// not migrate the generator; just prefer the newer routes for new experiments.
-type depthPageRoute struct{}
-
-func (depthPageRoute) prefix() string    { return depthPagePrefix }
-func (depthPageRoute) needsSecret() bool { return true }
 
 // depthMarkerBlock is the exact text written at a depth's offset: the prefix, the
 // unforgeable code, then a human depth label and the byte offset (for debugging and
@@ -116,20 +101,4 @@ func renderDepthPage(secret, id string, nbytes int) string {
 		copy(buf[off:], depthMarkerBlock(secret, id, pct, off))
 	}
 	return string(buf)
-}
-
-// build answers a request for a depth page. The spine has already 503'd if no
-// secret is set, so the secret here is non-empty. A malformed address is a 404, an
-// over-cap size a 413 (both from parseSizePath), and a size too small to hold the
-// markers without overlap a 400. Normal headers (pageHeaders{}), like every route but /ccdepthpage/.
-func (depthPageRoute) build(s *staticServer, w http.ResponseWriter, r *http.Request) ([]byte, string, string, pageHeaders, bool) {
-	id, nbytes, ok := parseSizePath(w, r, depthPagePrefix, maxDepthPageBytes)
-	if !ok {
-		return nil, "", "", pageHeaders{}, false
-	}
-	if !depthPageFits(s.pageCodeSecret, id, nbytes) {
-		http.Error(w, fmt.Sprintf("depth page too small: %d bytes cannot hold the depth markers", nbytes), http.StatusBadRequest)
-		return nil, "", "", pageHeaders{}, false
-	}
-	return []byte(renderDepthPage(s.pageCodeSecret, id, nbytes)), "depthpage.html", "text/html; charset=utf-8", pageHeaders{}, true
 }

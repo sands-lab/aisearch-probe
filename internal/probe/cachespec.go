@@ -208,3 +208,17 @@ func (d cacheDirectives) seconds(name string) (int, bool) {
 	}
 	return n, true
 }
+
+// humanDuration writes a number of seconds as a short, rounded duration.
+func humanDuration(s float64) string {
+	switch {
+	case s < 90:
+		return fmt.Sprintf("%.0fs", s)
+	case s < 90*60:
+		return fmt.Sprintf("%.0fm", s/60)
+	case s < 48*3600:
+		return fmt.Sprintf("%.1fh", s/3600)
+	default:
+		return fmt.Sprintf("%.1fd", s/86400)
+	}
+}

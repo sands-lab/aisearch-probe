@@ -57,29 +57,25 @@ func TestWritePageSetsContentType(t *testing.T) {
 	}
 }
 
-// Each generated route serves its own content type — the whole point of the
-// object-type study is that FORMAT is the only variable, which means the server
-// must actually label each format. The 5 original routes stay text/html (behaviour
-// unchanged); the 7 new routes each carry their format's type.
+// Each generated route serves its own content type: in the document-type test the
+// format is the only thing that changes, so the server must label each format.
 func TestGeneratedRouteContentTypes(t *testing.T) {
-	// A secret so the secret-gated routes (/cpage/, /depthpage/, and all 8 format
-	// routes) are reachable; /page/ does not need it.
+	// A secret, so the secret-gated routes are reachable.
 	srv, _, _ := newTestProxy(t, cpageServer(t, fmtTestSecret), "")
 
 	cases := []struct {
 		path     string
 		wantType string
 	}{
-		{"/page/ct-a", "text/html; charset=utf-8"},
 		{"/ccdepthpage/none/tag/ct-a/4096", "text/html; charset=utf-8"},
-		{"/htmlpage/ct-a", "text/html; charset=utf-8"},
-		{"/jsonpage/ct-a", "application/json"},
-		{"/txtpage/ct-a", "text/plain; charset=utf-8"},
-		{"/mdpage/ct-a", "text/markdown; charset=utf-8"},
-		{"/xmlpage/ct-a", "application/xml; charset=utf-8"},
-		{"/csvpage/ct-a", "text/csv; charset=utf-8"},
-		{"/pdfpage/ct-a", "application/pdf"},
-		{"/docxpage/ct-a", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+		{"/depthhtmlpage/ct-a/4096", "text/html; charset=utf-8"},
+		{"/depthjsonpage/ct-a/4096", "application/json"},
+		{"/depthtxtpage/ct-a/4096", "text/plain; charset=utf-8"},
+		{"/depthmdpage/ct-a/4096", "text/markdown; charset=utf-8"},
+		{"/depthxmlpage/ct-a/4096", "application/xml; charset=utf-8"},
+		{"/depthcsvpage/ct-a/4096", "text/csv; charset=utf-8"},
+		{"/depthpdfpage/ct-a/4096", "application/pdf"},
+		{"/depthdocxpage/ct-a/4096", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
 	}
 	for _, c := range cases {
 		t.Run(c.path, func(t *testing.T) {
@@ -100,48 +96,29 @@ func TestGeneratedRouteContentTypes(t *testing.T) {
 // silently matter).
 func TestGenPageRoutesCoverAndGate(t *testing.T) {
 	wantSecret := map[string]bool{
-		"/page/":      false,
-		"/sizepage/":  false,
-		"/depthpage/": true,
-		"/cpage/":     true,
 		// The cache-header test serves the shared depth content (per-page codes).
 		"/ccdepthpage/": true,
-		// Object-type study: 8 format routes, ALL need the secret — each prints a
-		// per-page unforgeable code, so "read" proves the model parsed THAT body.
-		"/htmlpage/": true,
-		"/jsonpage/": true,
-		"/txtpage/":  true,
-		"/mdpage/":   true,
-		"/xmlpage/":  true,
-		"/csvpage/":  true,
-		"/pdfpage/":  true,
-		"/docxpage/": true,
-		// Object-size study: format depth routes (scaled, HMAC markers) need the secret.
-		"/depthtxtpage/":    true,
-		"/depthpdfpage/":    true,
-		"/depthpdfrawpage/": true, // fault injection: invalid-UTF-8 PDF (investigation)
-		"/depthdocxpage/":   true,
-		"/depthctpage/":     true,
-		"/depthmdpage/":     true,
-		"/depthhtmlpage/":   true,
-		"/depthjsonpage/":   true,
-		"/depthxmlpage/":    true,
-		"/depthcsvpage/":    true,
-		// JavaScript study: same depth lines, written in by a script.
+		// The depth page in each format, and the declared-type variant.
+		"/depthtxtpage/":  true,
+		"/depthpdfpage/":  true,
+		"/depthdocxpage/": true,
+		"/depthctpage/":   true,
+		"/depthmdpage/":   true,
+		"/depthhtmlpage/": true,
+		"/depthjsonpage/": true,
+		"/depthxmlpage/":  true,
+		"/depthcsvpage/":  true,
+		// JavaScript test: same depth lines, written in by a script.
 		"/depthjsinlinepage/": true,
 		"/depthjsextpage/":    true,
 		"/depthjsdatapage/":   true,
 		"/depthjsldpage/":     true,
 		"/depthjsfile/":       true,
-		"/depthjsverpage/":    true,
-		"/depthjsverfile/":    true,
 		// The changeable page: the depth HTML/text page with versioned codes.
 		"/verhtmlpage/": true,
 		"/vertxtpage/":  true,
 		// The healable page: broken until the control fixes it, then the depth HTML page.
 		"/healpage/": true,
-		// The personal page: depth HTML whose codes follow one identity query item.
-		"/idpage/": true,
 	}
 	got := map[string]bool{}
 	for _, p := range genPageRoutes {
@@ -183,10 +160,10 @@ func TestServeGeneratedFallsThrough(t *testing.T) {
 	}
 }
 
-// The secret gate lives in the shared spine: a route that needs a secret 503s
-// without one, and a route that does not must NOT 503.
+// The secret gate lives in the shared spine: every route needs a secret and
+// answers 503 without one.
 func TestServeGeneratedSecretGate(t *testing.T) {
-	for _, path := range []string{"/cpage/0", "/depthpage/id/2048", "/jsonpage/x", "/pdfpage/x"} {
+	for _, path := range []string{"/depthhtmlpage/id/2048", "/depthjsonpage/x/2048", "/depthpdfpage/x/2048", "/ccdepthpage/none/tag/x/2048"} {
 		s := newStaticServer(t.TempDir(), "") // no secret set
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, path, nil)
@@ -196,16 +173,5 @@ func TestServeGeneratedSecretGate(t *testing.T) {
 		if code := w.Result().StatusCode; code != http.StatusServiceUnavailable {
 			t.Errorf("%s without a secret: status = %d, want 503", path, code)
 		}
-	}
-
-	// /page/ needs no secret, so it must not 503 when none is set.
-	s := newStaticServer(t.TempDir(), "")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/page/abc", nil)
-	if !s.serveGenerated(w, r) {
-		t.Fatal("/page/ should have been handled")
-	}
-	if code := w.Result().StatusCode; code == http.StatusServiceUnavailable {
-		t.Errorf("/page/ must not 503 when no secret is set (status = %d)", code)
 	}
 }

@@ -56,32 +56,13 @@ type genPage interface {
 // genPageRoutes is the routing table serveGenerated walks. No two prefixes are a
 // prefix of another, so match order does not matter.
 var genPageRoutes = []genPage{
-	pageRoute{},
-	sizePageRoute{},
-	depthPageRoute{},
-	cpageRoute{},
 	// The cache-header test: the ONLY route that chooses caching headers.
 	ccDepthRoute{},
-	// Object-type study: one route per document format, so a fetcher's fetch/read/
-	// cache behaviour can be compared across formats with FORMAT the only variable.
-	// Each carries a per-page UNFORGEABLE code (so "read" means the model extracted
-	// text from THIS body, not replayed a shared marker), so all need the secret.
-	htmlPageRoute{},
-	jsonPageRoute{},
-	txtPageRoute{},
-	mdPageRoute{},
-	xmlPageRoute{},
-	csvPageRoute{},
-	pdfPageRoute{},
-	docxPageRoute{},
-	// Object-SIZE study: format variants of the depth page (scaled, marker ladder).
+	// The depth page in each document format, plus the declared-type variant.
 	depthTxtRoute{},
 	depthPdfRoute{},
-	depthPdfRawRoute{}, // FAULT INJECTION (investigation only): invalid-UTF-8 PDF, see depthformats.go
 	depthDocxRoute{},
 	depthCtRoute{}, // same bytes, content-type chosen by path token (label lever)
-	// Same depth source encoded into every object format (fixed size = format exp;
-	// varied size = truncation exp). txt/pdf/docx above; these add md/html/json/xml/csv.
 	depthMdRoute{},
 	depthHTMLRoute{},
 	depthJSONRoute{},
@@ -93,9 +74,6 @@ var genPageRoutes = []genPage{
 	depthJSDataRoute{},
 	depthJSLDRoute{},   // the deeper markers in a JSON-LD block, never rendered
 	depthJSFileRoute{}, // the external variant's script file
-	// The script that changes at a switch time: does a vendor keep the script file?
-	depthJSVerPageRoute{},
-	depthJSVerFileRoute{}, // the ONE depthjs route whose Last-Modified moves (at the switch)
 	// The changeable page: the depth HTML/text page whose codes follow a version
 	// the control sets, at one fixed address (verpage.go).
 	versionRoutes["html"],
@@ -103,9 +81,6 @@ var genPageRoutes = []genPage{
 	// The healable page: broken (503/404/403) until the control fixes it, then the
 	// depth HTML page (healpage.go).
 	healPageRoute{},
-	// The personal page: the depth HTML page whose codes follow one named
-	// identity item in the query, for the private-link test (idpage.go).
-	idPageRoute{},
 }
 
 // serveGenerated dispatches a request to its generated-page route and runs the
@@ -203,3 +178,8 @@ func parseSizePath(w http.ResponseWriter, r *http.Request, prefix string, maxByt
 	}
 	return parts[0], nbytes, true
 }
+
+// pageModTime is the fixed date generated binary formats (docx/pdf zip entries)
+// stamp inside their bytes, so those bytes stay a pure function of the address.
+// It IS probe.PageLastModified, the Last-Modified writePage sends, defined once.
+var pageModTime = probe.PageLastModified

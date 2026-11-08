@@ -27,11 +27,8 @@ type staticServer struct {
 	heal         *healState  // per-caller first-sight time for /fault/heal/<sec>
 	loops        *flakyState // per-caller hop counts for /fault/loop/{a,b} (the hop cap)
 
-	// robots holds runtime Disallow rules layered on the on-disk robots.txt, and
-	// controlSecret guards the endpoint that flips them. Both serve the
-	// robots.txt invalidation experiment; the endpoint is off unless a secret is
-	// set. See robots.go.
-	robots        *robotsState
+	// controlSecret guards the page controls (correction, heal). The controls
+	// are off unless a secret is set.
 	controlSecret string
 
 	// versions is the changeable page's per-id current version, set through
@@ -59,7 +56,7 @@ type staticServer struct {
 func newStaticServer(dir, cacheControl string) *staticServer {
 	versions, _ := newVersionState("")   // memory-only never fails; main swaps in the file-backed one
 	healPages, _ := newHealPageState("") // same
-	return &staticServer{root: http.Dir(dir), cacheControl: cacheControl, flaky: newFlakyState(), heal: newHealState(), loops: newFlakyState(), robots: newRobotsState(),
+	return &staticServer{root: http.Dir(dir), cacheControl: cacheControl, flaky: newFlakyState(), heal: newHealState(), loops: newFlakyState(),
 		versions: versions, healPages: healPages, startedAt: time.Now().UTC().Truncate(time.Second)}
 }
 
@@ -103,14 +100,6 @@ func (s *staticServer) openFold(name string) (http.File, error) {
 }
 
 func (s *staticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// The robots control endpoint flips the experimental Disallow rules. When no
-	// secret is configured it is not a real endpoint and falls through to a 404.
-	if r.URL.Path == controlRobotsPath {
-		if s.serveControl(w, r) {
-			return
-		}
-	}
-
 	// The version control sets which version each changeable page serves. Off
 	// (falls through to a 404) unless a control secret is set. See verpage.go.
 	if r.URL.Path == controlVersionPath {
@@ -127,8 +116,7 @@ func (s *staticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// robots.txt is served dynamically (base file + experimental disallows) and
-	// no-store, so a mid-run flip is never hidden by a cache. See robots.go.
+	// robots.txt is served no-store. See robots.go.
 	if r.URL.Path == "/robots.txt" {
 		s.serveRobots(w)
 		return

@@ -248,15 +248,6 @@ func (depthPdfRoute) build(s *staticServer, w http.ResponseWriter, r *http.Reque
 
 const depthPdfRawPrefix = "/depthpdfrawpage/"
 
-type depthPdfRawRoute struct{}
-
-func (depthPdfRawRoute) prefix() string    { return depthPdfRawPrefix }
-func (depthPdfRawRoute) needsSecret() bool { return true }
-
-func (depthPdfRawRoute) build(s *staticServer, w http.ResponseWriter, r *http.Request) ([]byte, string, string, pageHeaders, bool) {
-	return buildDepthFormatRaw(s, w, r, depthPdfRawPrefix, renderDepthPDF, "depth-raw.pdf", "application/pdf")
-}
-
 // --- /depthdocxpage/ -------------------------------------------------------
 
 const depthDocxPrefix = "/depthdocxpage/"

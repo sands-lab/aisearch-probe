@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 
 	"aisearch-probe/internal/probe"
 )
@@ -174,93 +173,6 @@ func TestDepthJSScrambleRoundTrip(t *testing.T) {
 	}
 	if depthJSSeed("x", 4096) == depthJSSeed("y", 4096) || depthJSSeed("x", 4096) == depthJSSeed("x", 8192) {
 		t.Error("seed does not depend on both id and size")
-	}
-}
-
-// THE SCRIPT THAT CHANGES. Before the switch time the file carries version-1 codes,
-// after it version-2 codes; the page never changes. The file's version tag and date
-// move at the switch, so a fetcher asking "has this changed?" with what it saved is
-// told yes — never a "not modified" that would make it keep version 1 by our fault.
-func TestDepthJSVerSwitch(t *testing.T) {
-	const switchAt = int64(1893456000) // 2030-01-01, after probe.PageLastModified
-	clock := time.Unix(switchAt-60, 0)
-	depthJSNow = func() time.Time { return clock }
-	t.Cleanup(func() { depthJSNow = time.Now })
-
-	srv, _, _ := newTestProxy(t, cpageServer(t, depthFmtSecret), "")
-	page := "/depthjsverpage/sz-abc/1893456000/20000"
-	file := depthJSVerFilePath(depthFmtID, switchAt, depthFmtBytes)
-
-	pageBefore := body(t, get(t, srv.URL+page, nil))
-	r1 := get(t, srv.URL+file, nil)
-	fileBefore, tag1, date1 := body(t, r1), r1.Header.Get("ETag"), r1.Header.Get("Last-Modified")
-
-	// Before the switch, asking with the saved tag gets "not modified".
-	if r := get(t, srv.URL+file, map[string]string{"If-None-Match": tag1}); r.StatusCode != http.StatusNotModified {
-		t.Errorf("before the switch, re-ask with the saved tag: status %d, want 304", r.StatusCode)
-	}
-
-	clock = time.Unix(switchAt, 0)
-	pageAfter := body(t, get(t, srv.URL+page, nil))
-	r2 := get(t, srv.URL+file, nil)
-	fileAfter, tag2, date2 := body(t, r2), r2.Header.Get("ETag"), r2.Header.Get("Last-Modified")
-
-	if pageBefore != pageAfter {
-		t.Error("the page changed at the switch; only its script may")
-	}
-	if !strings.Contains(pageBefore, `<script src="`+file+`">`) {
-		t.Errorf("page does not load %s", file)
-	}
-	if fileBefore == fileAfter || tag1 == tag2 {
-		t.Error("the script file or its version tag did not change at the switch")
-	}
-	if date1 != probe.PageLastModified.Format(http.TimeFormat) {
-		t.Errorf("version 1 Last-Modified = %q, want the fixed page date", date1)
-	}
-	if want := time.Unix(switchAt, 0).UTC().Format(http.TimeFormat); date2 != want {
-		t.Errorf("version 2 Last-Modified = %q, want the switch time %q", date2, want)
-	}
-	// After the switch, asking with what was saved before gets the new file.
-	for name, h := range map[string]map[string]string{
-		"saved tag":  {"If-None-Match": tag1},
-		"saved date": {"If-Modified-Since": date1},
-	} {
-		if r := get(t, srv.URL+file, h); r.StatusCode != http.StatusOK {
-			t.Errorf("after the switch, re-ask with the %s: status %d, want 200", name, r.StatusCode)
-		}
-	}
-
-	// Raw bytes give nothing past the top code, at either version.
-	for _, v := range []int{1, 2} {
-		if d := probe.DeepestDepth(pageAfter, depthFmtSecret, depthFmtID, v); d > 0 {
-			t.Errorf("page raw bytes score depth %d at version %d, want none past the top", d, v)
-		}
-		for _, f := range []string{fileBefore, fileAfter} {
-			if d := probe.DeepestDepth(f, depthFmtSecret, depthFmtID, v); d != -1 {
-				t.Errorf("script raw bytes score depth %d at version %d, want none", d, v)
-			}
-		}
-	}
-
-	// Run each script: it writes exactly its version's lines, and none of the other's codes.
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node not installed; cannot run the page script")
-	}
-	deepest := probe.DepthPercents[len(probe.DepthPercents)-1]
-	for v, src := range map[int]string{1: fileBefore, 2: fileAfter} {
-		want := depthFormatLinesRev(depthFmtSecret, depthFmtID, depthFmtBytes, true, v)[1:]
-		got := strings.Join(runDepthJS(t, node, src, ""), "\n")
-		if got != strings.Join(want, "\n") {
-			t.Errorf("version %d script did not write its version's lines", v)
-		}
-		other := 3 - v
-		if d := probe.DeepestDepth(got, depthFmtSecret, depthFmtID, v); d != deepest {
-			t.Errorf("version %d script scores %d on its own codes, want %d", v, d, deepest)
-		}
-		if d := probe.DeepestDepth(got, depthFmtSecret, depthFmtID, other); d != -1 {
-			t.Errorf("version %d script carries version %d codes (depth %d)", v, other, d)
-		}
 	}
 }
 

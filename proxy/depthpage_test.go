@@ -1,11 +1,8 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
@@ -113,63 +110,6 @@ func TestDepthPageCodesAreUnforgeable(t *testing.T) {
 	}
 }
 
-// Served end to end: a real, stamped, cacheable page — ETag over the exact bytes,
-// no Cache-Control (the normal page), byte-exact.
-func TestDepthPageServedStampedAndExact(t *testing.T) {
-	srv, read, _ := newTestProxy(t, depthServer(t, depthTestSecret), "")
-
-	resp := get(t, srv.URL+"/depthpage/dp-a/65536", nil)
-	got := body(t, resp)
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
-	if len(got) != 65536 {
-		t.Errorf("served body is %d bytes, want 65536", len(got))
-	}
-	sum := sha256.Sum256([]byte(got))
-	wantETag := `"` + hex.EncodeToString(sum[:8]) + `"`
-	if et := resp.Header.Get("ETag"); et != wantETag {
-		t.Errorf("ETag = %q, want %q (over the exact body)", et, wantETag)
-	}
-	if _, present := resp.Header["Cache-Control"]; present {
-		t.Errorf("Cache-Control = %q, want none (the normal page)", resp.Header.Get("Cache-Control"))
-	}
-	if recs := read(); len(recs) != 1 || !recs[0].Stamped() {
-		t.Fatalf("the log must show the depth page as one stamped fetch: %+v", recs)
-	}
-}
-
-// It must answer "has this changed?" with a 304, or a polite crawler re-downloads
-// it — same as /page/.
-func TestDepthPageAnswers304(t *testing.T) {
-	srv, _, _ := newTestProxy(t, depthServer(t, depthTestSecret), "")
-	first := get(t, srv.URL+"/depthpage/dp-b/131072", nil)
-	first.Body.Close()
-	etag := first.Header.Get("ETag")
-	if etag == "" {
-		t.Fatal("no ETag on first fetch")
-	}
-	second := get(t, srv.URL+"/depthpage/dp-b/131072", map[string]string{"If-None-Match": etag})
-	defer second.Body.Close()
-	if second.StatusCode != http.StatusNotModified {
-		t.Errorf("revalidation returned %d, want 304", second.StatusCode)
-	}
-}
-
-// Without a secret the route must refuse (503), never serve guessable markers.
-func TestDepthPageRefusesWithoutSecret(t *testing.T) {
-	srv, _, _ := newTestProxy(t, depthServer(t, ""), "")
-	resp := get(t, srv.URL+"/depthpage/dp-a/65536", nil)
-	got := body(t, resp)
-	if resp.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("no secret: status = %d, want 503", resp.StatusCode)
-	}
-	if strings.Contains(got, probe.DepthMarkerPrefix) {
-		t.Error("no secret must not print any marker")
-	}
-}
-
 // A malformed address must 404, never read as a real page.
 func TestDepthPageMalformedIs404(t *testing.T) {
 	srv, _, _ := newTestProxy(t, depthServer(t, depthTestSecret), "")
@@ -213,25 +153,5 @@ func TestDepthCorpusHasNoReservedPrefix(t *testing.T) {
 	}
 	if strings.Contains(depthCorpus, probe.DepthMarkerPrefix) {
 		t.Errorf("filler corpus contains the reserved prefix %q — a marker could be faked by filler", probe.DepthMarkerPrefix)
-	}
-}
-
-// The route must not shadow /page/ (retention), /fault/, /cpage/ or /sizepage/,
-// and no real file under probe-site/ may shadow the /depthpage/ prefix.
-func TestNoRealPageShadowsTheDepthPagePrefix(t *testing.T) {
-	entries, err := os.ReadDir("../site")
-	if err != nil {
-		t.Fatalf("read probe-site: %v", err)
-	}
-	for _, e := range entries {
-		name := strings.ToLower(e.Name())
-		if name == "depthpage" || strings.HasPrefix(name, "depthpage.") {
-			t.Errorf("probe-site/%s would shadow the reserved /depthpage/ prefix", e.Name())
-		}
-	}
-	for _, other := range []string{pagePrefix, faultPrefix, cpagePrefix, sizePagePrefix} {
-		if strings.HasPrefix(depthPagePrefix, other) || strings.HasPrefix(other, depthPagePrefix) {
-			t.Errorf("/depthpage/ (%q) and %q shadow each other", depthPagePrefix, other)
-		}
 	}
 }

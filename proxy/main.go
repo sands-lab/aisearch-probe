@@ -35,7 +35,7 @@ var (
 	serveFlag        = flag.String("serve", "", "Serve pages from this directory instead of proxying (use instead of -origin)")
 	ccFlag           = flag.String("cache-control", "", "Cache-Control sent with the static probe-site/ pages (-serve mode only). Default: none, the normal page (DECISIONS.md § D13). Generated pages ignore it")
 	robotsSecretFlag = flag.String("robots-control-secret", os.Getenv("PROBE_CONTROL_SECRET"),
-		"Secret that enables POST /control/robots to flip experimental robots.txt disallows (-serve mode only; empty = endpoint disabled)")
+		"Password for the page controls, POST /control/version and /control/heal (-serve mode only; empty = controls disabled)")
 	pageCodeSecretFlag = flag.String("page-code-secret", os.Getenv("PROBE_PAGE_CODE_SECRET"),
 		"Secret key for the unforgeable per-page codes on /cpage/ (-serve mode only; empty = /cpage/ route disabled)")
 	versionStateFlag = flag.String("version-state-file", "logs/verpage-state.json",
@@ -123,14 +123,13 @@ func main() {
 			log.Printf("[probe] Cache-Control on static pages: %s", *ccFlag)
 		}
 		if st.controlSecret != "" {
-			log.Printf("[probe] robots.txt control endpoint ENABLED at POST %s (secret set)", controlRobotsPath)
 			log.Printf("[probe] changeable-page version control ENABLED at POST %s (state: %q, %d page(s) loaded)",
 				controlVersionPath, *versionStateFlag, len(versions.pages))
 			log.Printf("[probe] healable-page control ENABLED at POST %s (state: %q, %d page(s) loaded)",
 				controlHealPath, *healStateFlag, len(healPages.pages))
 		}
 		if st.pageCodeSecret != "" {
-			log.Printf("[probe] coded pages ENABLED at %s<id> (per-page unforgeable codes)", cpagePrefix)
+			log.Printf("[probe] depth pages ENABLED (per-page unforgeable codes)")
 		}
 	} else {
 		originURL, err := url.Parse(*originFlag)

@@ -30,7 +30,7 @@ import (
 //
 // WHY THE FAULT IS IN THE PATH, NOT THE QUERY. httpbin and similar tools trigger
 // faults from a query parameter. We cannot: a provider that strips the query
-// (Gemini does — measured, FINDINGS.md § Result 6) would silently disable a
+// (Gemini does — measured) would silently disable a
 // query-triggered fault and the server would serve a normal page instead, which
 // is the one failure that would fabricate a result. A path trigger survives
 // query-stripping. The query is left to carry the ?probe= token for attribution.
@@ -41,7 +41,7 @@ import (
 // SHOULD retry it — which turns the result from "what it did" into "whether that
 // was correct", the same shape as the address-variation result.
 //
-// References for the method are in doc/fault-injection.md, for the write-up.
+// References for the method are in docs/experiments/fault.md, for the write-up.
 //
 //	path                should a good client retry?   the standard it tests against
 //	-----------------   ---------------------------   ------------------------------
@@ -91,7 +91,7 @@ const faultPrefix = "/fault/"
 var slowFaultDelay = 25 * time.Second
 
 // faultDepthBytes is the size of the depth part of a content-ending fault's
-// body. 2048 matches the cache-header test's default page (-ttlmap-size), so a
+// body. 2048 matches the cache-header test's default page (-cacheHeaders-pageSize), so a
 // fault page is the same page the caching runs serve and only the failure
 // differs. Small because the faults are about retrieval, not size.
 const faultDepthBytes = 2048
@@ -291,7 +291,7 @@ func (s *staticServer) serveFault(w http.ResponseWriter, r *http.Request) bool {
 		// the prefix on as the page. The depth markers in the answer tell which.
 		// Like reset, the hijack means THIS hit may log without a status.
 		// Whether cloudflared preserves the cut is a live check, not a given:
-		// see doc/fault-injection.md.
+		// see docs/experiments/fault.md.
 		if s.faultSecretMissing(w) {
 			return true
 		}

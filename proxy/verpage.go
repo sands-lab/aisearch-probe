@@ -16,7 +16,7 @@ import (
 
 // THE CHANGEABLE PAGE — one address whose content flips from version 1 (A) to
 // version 2 (B), for the correction-visibility and type-vs-correction tests
-// (doc/handoff-changeable-page.md; plan items 3 and 8).
+// (docs/experiments/correction.md; plan items 3 and 8).
 //
 // IT IS THE DEPTH PAGE, NOT A NEW PAGE. /correction/html/<id>/<bytes> and
 // /correction/txt/<id>/<bytes> serve exactly what /depth/html/ and /depth/txt/
@@ -38,7 +38,7 @@ import (
 // consequence: a fetcher revalidating by date alone after the flip would be told
 // "not modified" and keep version 1, and that would be OUR bug read as theirs. So
 // the page carries the time its current version was set. It still sends no
-// Cache-Control and no Expires (the D13 normal page).
+// Cache-Control and no Expires (the normal page).
 //
 // THE STATE IS SAVED TO A FILE (-correction-serverStateFile) and read back at start-up,
 // so an origin restart mid-run does not turn every version-2 page back into a 404.

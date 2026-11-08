@@ -9,7 +9,7 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// The design the user agreed (2026-10-07): 11 settings. Every "don't reuse without
+// The agreed design: 11 settings. Every "don't reuse without
 // asking" setting runs with AND without version info, a full grid so each can be
 // compared both ways (for no-store/private/expired the spec expects no difference,
 // so only a difference is worth reporting); the timed settings run with the date;
@@ -162,7 +162,7 @@ func TestCcDepthAsksRotateTheNamedCode(t *testing.T) {
 			t.Errorf("ask %d asks for depth %d%%, want %d%%", ask, got, pct)
 		}
 	}
-	// Since 2026-10-25 the named-code question IS the standard question (D14).
+	// Since 2026-10-25 the named-code question IS the standard question .
 	for _, pct := range probe.DepthPercents {
 		if rotatedQuestion(pct) != standardQuestion(pct) {
 			t.Errorf("rotatedQuestion(%d) = %q, want the standard question", pct, rotatedQuestion(pct))

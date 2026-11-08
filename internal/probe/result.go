@@ -8,7 +8,7 @@ package probe
 // invented its own field names for the same ideas — reask_answer, broken_marker,
 // a_reask_fetches — so the outputs were not one dataset and, worse, a rebuild of
 // one runner once dropped reask_answer, the model's own words, which was the
-// evidence for a finding. See doc/standard-record-interface-handover.md.
+// evidence for a finding.
 //
 // Two rules make that impossible to repeat:
 //
@@ -79,7 +79,7 @@ type ResultRecord struct {
 	Error         string `json:"error,omitempty"`  // transport/client error if the ask itself failed
 
 	// Cost of the call, as raw token usage from the provider's own usage object.
-	// FACTS ONLY — dollars are DERIVED later from PROVIDERS.md prices (which carry
+	// FACTS ONLY — dollars are DERIVED later from the vendors' prices (which carry
 	// dates and change), the same discipline as the fetch count and the verdict.
 	// input_tokens also gauges how much fetched content entered the model context.
 	// Zero when the provider reported no usage (e.g. an errored call).

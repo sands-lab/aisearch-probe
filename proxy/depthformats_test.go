@@ -17,8 +17,8 @@ import (
 
 // The depth markers must survive the round-trip into each format AND come back in
 // order — otherwise a vendor's "stopped at marker k" would be our extraction
-// artifact, not the fetcher's cut. These tests are the guard the handover demands
-// before any paid run.
+// artifact, not the fetcher's cut. These tests are the guard to pass before any
+// paid run.
 
 const depthFmtSecret = "test-page-code-secret"
 const depthFmtID = "sz-abc"

@@ -16,21 +16,20 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// FORMAT variants of the depth page (truncation-depth probe), for the object-size
-// study: does read depth and input-token cost scale differently by FORMAT? The
-// original /depthpage/ serves marker-laden real prose as HTML; these serve the SAME
+// FORMAT variants of the depth page, for the document-type and read-depth tests:
+// does read depth and input-token cost differ by FORMAT? These serve the SAME
 // depth markers (probe.DepthCode at probe.DepthPercents, so truncrun reads them back
 // unchanged) as plain text, PDF, and DOCX.
 //
-// Why a LINE-based payload, not the byte-exact one /depthpage/ uses: a PDF or DOCX
+// Why a LINE-based payload, not a byte-exact one: a PDF or DOCX
 // extractor returns text per line/paragraph, and a marker split across a line break
 // would not survive the round-trip. So each marker sits on its OWN line, and the
 // filler is whole lines of corpus. The marker still lands near its depth; the exact
 // byte offset is approximate (fine for a cut READING, which is ordinal), and the
 // ordinal depth — which marker was the deepest quoted — is exact.
 //
-// All three need the server secret (the codes are HMACs), like /depthpage/. They are
-// sent with the normal headers (no Cache-Control). Sizes come in the PATH (/depthXpage/<id>/<bytes>) and
+// All need the server secret (the codes are HMACs). They are
+// sent with the normal headers (no Cache-Control). Sizes come in the PATH (/depth/<kind>/<id>/<bytes>) and
 // mean the EXTRACTED-TEXT size (what the fetcher's token window sees) — the PDF/DOCX
 // file is larger because of its container, which is the point of the comparison.
 
@@ -83,7 +82,7 @@ func depthFormatLinesRev(secret, id string, nbytes int, trimUTF8 bool, revision 
 
 // depthCorpusLine returns n bytes of the frozen corpus as one clean line (no
 // newlines), cycling. The corpus never contains the marker prefix (enforced by a
-// test on /depthpage/), so filler cannot spell a marker.
+// test), so filler cannot spell a marker.
 func depthCorpusLine(ci *int, n int) string {
 	return depthCorpusLineOpt(ci, n, true)
 }
@@ -298,7 +297,7 @@ func (depthDocxRoute) build(s *staticServer, w http.ResponseWriter, r *http.Requ
 // Serves the IDENTICAL line-based body under a content-type chosen by a path token
 // (/depth/declaredType/<token>/<id>/<bytes>). Same bytes, only the label differs, so a
 // read-depth difference between tokens is purely the content-type — the clean,
-// byte-identical A/B that /depthpage/-vs-/depth/txt/ could not be (their bodies
+// byte-identical A/B that /depth/html/-vs-/depth/txt/ could not be (their bodies
 // differ in layout). This is how we isolate "does the stamp change the read window".
 
 const depthCtPrefix = "/depth/declaredType/"

@@ -84,7 +84,7 @@ func probeToken(identity string) string {
 // punctuation mark). The code is an OPAQUE HANDLE: its meaning — vendor, model,
 // run, step — is recorded in the standard result record's own fields
 // (internal/probe/result.go), never read back out of the code. So the shape is
-// free to be tidy without losing anything. See DECISIONS.md § probe-code-shape.
+// free to be tidy without losing anything.
 func sanitizeTokenField(identity string) string {
 	var b strings.Builder
 	lastDash := true // start "on a dash" so any leading run is trimmed

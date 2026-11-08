@@ -53,7 +53,7 @@ func TestTruncActionsReps(t *testing.T) {
 	}
 }
 
-// The ladder is the octave range the handover fixed: 64 KiB..4 MiB, ascending.
+// The ladder is the agreed octave range: 64 KiB..4 MiB, ascending.
 func TestTruncLadderRange(t *testing.T) {
 	sizes := truncLadder()
 	if sizes[0] != 64<<10 {
@@ -134,7 +134,7 @@ func TestTruncEmitCarriesDepthAndAnswer(t *testing.T) {
 
 	a := &TruncAction{
 		ID: id + "#0", Provider: "or:openai", Model: "openai/gpt-5-mini",
-		PageID: id, URL: "https://h/depthpage/" + id + "/262144", Bytes: 262144,
+		PageID: id, URL: "https://h/depth/html/" + id + "/262144", Bytes: 262144,
 		Part: "A", Step: "scan", Seq: 0, Answer: ans, FiredUnix: 1,
 	}
 	truncEmit("run1", a, secret, true)

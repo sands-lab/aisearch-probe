@@ -76,7 +76,7 @@ func TestWritePageWithoutValidatorsNeverAnswers304(t *testing.T) {
 	}
 }
 
-// THE LEAK GUARD (DECISIONS.md § D13). Only the cache-header test may choose a
+// THE LEAK GUARD. Only the cache-header test may choose a
 // caching header. Every other generated page must serve exactly the normal
 // headers, so no test setting — no-store above all — can contaminate another
 // experiment. Every route needs a sample here, so a new route cannot skip it.
@@ -99,21 +99,8 @@ func TestOnlyTheCacheTestRouteChoosesCacheHeaders(t *testing.T) {
 	}
 	srv, _, _ := newTestProxy(t, st, "")
 	samples := map[string]string{
-		"/page/":                   "/page/g-a",
-		"/sizepage/":               "/sizepage/g-a/4096",
-		"/depthpage/":              "/depthpage/g-a/65536",
-		"/cpage/":                  "/cpage/cr01-xy",
-		"/htmlpage/":               "/htmlpage/g-a",
-		"/jsonpage/":               "/jsonpage/g-a",
-		"/txtpage/":                "/txtpage/g-a",
-		"/mdpage/":                 "/mdpage/g-a",
-		"/xmlpage/":                "/xmlpage/g-a",
-		"/csvpage/":                "/csvpage/g-a",
-		"/pdfpage/":                "/pdfpage/g-a",
-		"/docxpage/":               "/docxpage/g-a",
 		"/depth/txt/":              "/depth/txt/g-a/4096",
 		"/depth/pdf/":              "/depth/pdf/g-a/4096",
-		"/depthpdfrawpage/":        "/depthpdfrawpage/g-a/4096",
 		"/depth/docx/":             "/depth/docx/g-a/4096",
 		"/depth/declaredType/":     "/depth/declaredType/plain/g-a/4096",
 		"/depth/md/":               "/depth/md/g-a/4096",
@@ -129,7 +116,6 @@ func TestOnlyTheCacheTestRouteChoosesCacheHeaders(t *testing.T) {
 		"/correction/html/":        "/correction/html/g-a/2048",
 		"/correction/txt/":         "/correction/txt/g-a/2048",
 		"/heal/":                   "/heal/g-a/2048",
-		"/idpage/":                 "/idpage/g-a/mc_eid/2048?mc_eid=user-1",
 	}
 	fixed := probe.PageLastModified.Format(http.TimeFormat)
 	for _, p := range genPageRoutes {
@@ -173,7 +159,7 @@ func TestOnlyTheCacheTestRouteChoosesCacheHeaders(t *testing.T) {
 	}
 }
 
-// The static probe-site/ pages (index.html, method.html, staleness.html, …) get the
+// The static site/ pages (index.html, method.html, staleness.html, …) get the
 // -cacheControl flag. Its default must be "send none" — the same normal page.
 func TestStaticCacheControlDefaultsToNone(t *testing.T) {
 	f := flag.Lookup("cacheControl")

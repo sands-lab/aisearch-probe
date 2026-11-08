@@ -42,8 +42,8 @@ type staticServer struct {
 	// below, which is the old timer-based /fault/heal/<sec>.)
 	healPages *healPageState
 
-	// pageCodeSecret keys the unforgeable per-page codes on /cpage/ (see cpage.go).
-	// Empty means the /cpage/ route refuses to serve.
+	// pageCodeSecret keys the unforgeable per-page codes on the depth pages.
+	// Empty means those pages refuse to serve (503).
 	pageCodeSecret string
 
 	// startedAt is when this origin started, to the second (an HTTP date has no
@@ -122,12 +122,10 @@ func (s *staticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generated pages live at a per-run address that has never been fetched before
-	// — the robots.txt experiments need that. Each route (/page/, /cpage/,
-	// /sizepage/, /depthpage/, /cacheHeaders/, …) is a genPage; serveGenerated runs
-	// the shared spine and returns true once it has handled the request. They are
-	// SEPARATE routes on purpose: /page/'s bytes (which the retention run depends
-	// on) stay untouched by the others. See genpage.go.
+	// Generated pages live at a per-run address that has never been fetched
+	// before. Each route (/depth/..., /cacheHeaders/, /correction/..., /heal/) is a
+	// genPage; serveGenerated runs the shared spine and returns true once it has
+	// handled the request. See genpage.go.
 	if s.serveGenerated(w, r) {
 		return
 	}

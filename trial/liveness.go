@@ -63,8 +63,8 @@ func checkPageLive(ctx context.Context, pageURL, marker string) PageLiveness {
 	// the page is being served right now, not that we once saw it.
 	req.Header.Set("Cache-Control", "no-cache")
 
-	// probeHTTPClient, not the default client: this network cannot resolve
-	// *.trycloudflare.com, and the default resolver made a live page look dead.
+	// probeHTTPClient, not the default client: some networks cannot resolve a
+	// tunnel host name, and the default resolver then makes a live page look dead.
 	resp, err := probeHTTPClient(30 * time.Second).Do(req)
 	if err != nil {
 		l.Err = err.Error()

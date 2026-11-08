@@ -14,12 +14,12 @@ import (
 // under one response-header setting. These tables are the ONLY place a test cache
 // setting is defined: the proxy serves from them, the trial runner builds its pages
 // and grades its results from them. Every other generated page sends no
-// Cache-Control at all (DECISIONS.md § D13) — a test setting must never leak into
+// Cache-Control at all — a test setting must never leak into
 // another experiment's pages.
 //
 // The grading rule is RFC 9111 (HTTP Caching) read for a SHARED cache: a store
 // that hands one copy to many users, which is what an AI vendor's fetch cache is.
-// See doc/cache-directive-test.md for the section-by-section reading.
+// See docs/experiments/cacheHeaders.md for the section-by-section reading.
 
 // PageLastModified is the fixed "last changed" date every generated page carries.
 // Fixed so the bytes, and so the ETag, never drift. It is nine months before the

@@ -14,7 +14,7 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// THE CHANGEABLE PAGE (doc/handoff-changeable-page.md). One address whose content
+// THE CHANGEABLE PAGE (docs/experiments/correction.md). One address whose content
 // flips from version 1 (A) to version 2 (B) when the control says so. These tests
 // pin the spec before the code exists:
 //   - version 1 IS the existing 2 KB depth page, byte for byte (reuse, not a new page)

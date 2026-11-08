@@ -10,7 +10,7 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// THE CORRECTION RUN (doc/handoff-changeable-page.md; plan items 3 and 8), runner
+// THE CORRECTION RUN (docs/experiments/correction.md; plan items 3 and 8), runner
 // side. Spec pinned here before the code:
 //   - ONE FRESH PAGE PER CHECK TIME, per (vendor, format, trial), on the changeable
 //     page (/correction/html/ or /correction/txt/): warmed once, switched once, asked again
@@ -598,7 +598,7 @@ func TestFirstEvents(t *testing.T) {
 
 // A sitting can be planned now and start later (repeats are spread across days and
 // hours). The start must carry an explicit time zone — a bare "10:00" is ambiguous
-// between Riyadh and UTC — and a time in the past or more than 30 days out is
+// between local time and UTC — and a time in the past or more than 30 days out is
 // almost certainly a typo, so it is refused. Empty means "now".
 func TestParseStartAt(t *testing.T) {
 	now := time.Date(2026, 10, 14, 11, 0, 0, 0, time.UTC)
@@ -606,7 +606,7 @@ func TestParseStartAt(t *testing.T) {
 	if err != nil || !got.Equal(now) {
 		t.Errorf(`"" -> %v, %v; want now`, got, err)
 	}
-	want := time.Date(2026, 10, 15, 7, 0, 0, 0, time.UTC) // Thu 10:00 Riyadh
+	want := time.Date(2026, 10, 15, 7, 0, 0, 0, time.UTC) // Thu 10:00 at UTC+3
 	for _, s := range []string{"2026-10-15T10:00:00+03:00", "2026-10-15T10:00+03:00", "2026-10-15T07:00Z"} {
 		got, err := parseStartAt(s, now)
 		if err != nil || !got.Equal(want) {
@@ -615,7 +615,7 @@ func TestParseStartAt(t *testing.T) {
 	}
 	for s, why := range map[string]string{
 		"2026-10-15T10:00":       "no time zone",
-		"2026-10-14T13:00+03:00": "in the past (13:00 Riyadh = 10:00 UTC)",
+		"2026-10-14T13:00+03:00": "in the past (13:00 at UTC+3 = 10:00 UTC)",
 		"2026-11-20T10:00+03:00": "more than 30 days out",
 		"Thursday 10am":          "not a date",
 	} {

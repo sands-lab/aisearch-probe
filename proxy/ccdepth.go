@@ -26,7 +26,7 @@ import (
 //     minutes), or "notag" (neither, so "check with the site" can only be a full
 //     re-download).
 //
-// THIS IS THE ONLY ROUTE ALLOWED TO CHOOSE CACHING HEADERS (DECISIONS.md § D13);
+// THIS IS THE ONLY ROUTE ALLOWED TO CHOOSE CACHING HEADERS;
 // every other route returns pageHeaders{} and a test enforces it. The grading rule
 // (what RFC 9111 allows a shared cache for each setting) is probe.SharedReuseLimit.
 

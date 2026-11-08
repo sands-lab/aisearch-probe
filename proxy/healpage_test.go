@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// THE HEALABLE PAGE (remembered-failure redo; doc/handoff-cacheheader-day2-and-heal.md
+// THE HEALABLE PAGE (remembered-failure redo; docs/experiments/heal.md
 // Part 2). One address that fails until the control fixes it, so the time a page
 // recovers is ours and exact — not "a set time after the first request", which a
 // vendor sending several requests per ask blurs. These tests pin the spec first:

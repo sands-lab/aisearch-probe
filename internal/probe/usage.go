@@ -2,9 +2,9 @@ package probe
 
 // Token-usage parsing — a SHARED module for every run, not just one experiment.
 //
-// Every model call has a cost, and the user's standing requirement is that every
-// event records it (TODO.md § Instrument). The cost is raw token usage (a fact);
-// dollars are derived later from PROVIDERS.md prices. Providers report usage in
+// Every model call has a cost, and the standing requirement is that every
+// event records it. The cost is raw token usage (a fact);
+// dollars are derived later from the vendors' prices. Providers report usage in
 // different shapes and some omit it, so this is a small general interface — one
 // UsageParser per response shape — that any runner (or the analyzer, or a new
 // script) can reuse rather than re-parsing vendor JSON by hand.

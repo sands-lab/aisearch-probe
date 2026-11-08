@@ -14,10 +14,9 @@ import (
 
 // REACHING OUR OWN PROBE WHEN THE LOCAL RESOLVER CANNOT SEE IT.
 //
-// This network does not resolve *.trycloudflare.com. run-pilot.sh has always
-// worked around that for curl, with DNS-over-HTTPS plus --resolve. The Go driver
-// did not, so its own page check failed with "i/o timeout" against a page that
-// was serving perfectly — and refused to start the sharing experiment.
+// Some networks do not resolve tunnel host names. Without a workaround the
+// driver's own page check fails with "i/o timeout" against a page that is serving
+// perfectly, and the experiment refuses to start.
 //
 // Fixed here rather than by passing an address in, because anyone running
 // probe-trial by hand meets the same wall. Provider API calls are untouched:

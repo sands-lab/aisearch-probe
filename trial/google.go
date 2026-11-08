@@ -295,7 +295,7 @@ func retrievalError(md []urlRetrieval) error {
 	for _, u := range md {
 		if u.Status != "" && u.Status != urlRetrievalSuccess {
 			return fmt.Errorf("gemini urlContext could not retrieve %s: %s — "+
-				"Google documents that tunneling services are unsupported by this tool; see PROVIDERS.md",
+				"Google documents that tunneling services are unsupported by this tool",
 				u.URL, u.Status)
 		}
 	}

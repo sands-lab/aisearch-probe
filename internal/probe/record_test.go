@@ -229,7 +229,7 @@ func TestNginxModeALineAnalysesCorrectly(t *testing.T) {
 // Adding a signature must reclassify logs already on disk — including records a
 // previous collector wrote as "unknown" before that signature existed.
 func TestNormalizeReclassifiesPreviouslyUnknownBots(t *testing.T) {
-	r := Record{Bot: "unknown", UserAgent: "probe-selfcheck/1 (run-pilot.sh)", TS: "2026-08-30T14:00:00Z"}
+	r := Record{Bot: "unknown", UserAgent: "probe-selfcheck/1 (a shell script)", TS: "2026-08-30T14:00:00Z"}
 	r.Normalize()
 	if r.Bot != "probe-selfcheck" {
 		t.Errorf("Bot = %q, want probe-selfcheck — a stale 'unknown' must be re-derived", r.Bot)

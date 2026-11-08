@@ -15,7 +15,7 @@ import (
 // and trailer.
 //
 // The bytes are a pure function of the id (no embedded timestamps), so the ETag over
-// them is stable and revalidation works like /page/. Realistic header (Cache-Control
+// them is stable and revalidation works. Realistic header (Cache-Control
 // omitted, NOT no-store).
 
 // pdfEscapeString escapes the three characters that are special inside a PDF literal

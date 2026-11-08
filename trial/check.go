@@ -222,7 +222,7 @@ func runCheck(provs []Caller, base, secret string, force bool) bool {
 		default:
 			fmt.Printf("  OPENROUTER CREDIT: %s\n", c)
 			// 3 cents per call is deliberately pessimistic: the measured blended
-			// figure is about 2 cents (see PROVIDERS.md).
+			// figure is about 2 cents .
 			if ok, need := c.FitsRun(24, 0.03); !ok {
 				fmt.Printf("  ⚠ a 24-call run needs about $%.2f — top up before starting\n", need)
 			}
@@ -393,7 +393,7 @@ func runCheck(provs []Caller, base, secret string, force bool) bool {
 				// content — so when the two disagree, the marker wins.
 				//
 				// The known instance had a documented cause: Google's urlContext does
-				// not support tunneling domains, and our host is *.trycloudflare.com.
+				// not support tunneling domains, and the page was on a tunnel host.
 				// Hence the wording below states the observation, not a mechanism.
 				allGood = false
 				fmt.Printf("    fetched page : \033[31mFETCHED BUT NO CONTENT IN ANSWER\033[0m — this vendor's fetcher\n")
@@ -402,8 +402,8 @@ func runCheck(provs []Caller, base, secret string, force bool) bool {
 				fmt.Printf("                   was unrelated activity. Caching cannot be measured here:\n")
 				fmt.Printf("                   every round would fetch, which is the failure path rather\n")
 				fmt.Printf("                   than the behaviour under study.\n")
-				fmt.Printf("                   For Gemini on a *.trycloudflare.com host this is expected —\n")
-				fmt.Printf("                   tunneling domains are unsupported by urlContext (PROVIDERS.md).\n")
+				fmt.Printf("                   For Gemini on a tunnel address this is expected —\n")
+				fmt.Printf("                   Google documents that urlContext does not support tunneling services.\n")
 			} else {
 				allGood = false
 				fmt.Printf("    fetched page : NO — no marker in the answer AND no fetch by this\n")

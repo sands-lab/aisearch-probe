@@ -8,10 +8,8 @@ import (
 	"strings"
 )
 
-// Coded pages (/cpage/<id>) carry per-page UNFORGEABLE codes, so a code in an
-// answer proves the model actually read THAT page — unlike the shared RCP-2026-08
-// marker, which every page carries and so proves nothing (a model can replay it or
-// find it on another study page). This file is the single source of truth for both
+// Per-page UNFORGEABLE codes, so a code in an answer proves the model actually
+// read THAT page. This file is the single source of truth for both
 // the origin (which prints the codes) and the driver (which recomputes them to
 // check an answer, and reads the subject register to pick a unique subject).
 //
@@ -19,8 +17,7 @@ import (
 // code cannot be produced from the id in the URL — only by fetching the page.
 // Keying on the field gives two independent codes per page (one quoted in the
 // warm, one never asked); keying on the version lets a mutated page (v2) carry a
-// different code, so "stale copy vs re-fetched" is decidable. See
-// doc/content-reuse-cpage-needs.md and doc/study-plan.md.
+// different code, so "stale copy vs re-fetched" is decidable.
 
 // Field labels for the two codes. Ref is quoted during the warm; Rec is the
 // never-asked code the blind content-lookup test goes after.

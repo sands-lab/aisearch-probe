@@ -20,7 +20,7 @@ import (
 )
 
 // THE CORRECTION RUN — when does a corrected page reach an answer?
-// (doc/handoff-changeable-page.md; plan items 3 "visibility of a page correction"
+// (docs/experiments/correction.md; plan items 3 "visibility of a page correction"
 // and 8 "content type vs update".)
 //
 // Each trial is one fresh changeable page (/correction/html/ or /correction/txt/, see
@@ -44,8 +44,8 @@ import (
 // (RFC 2330 §11.1.1). Both are drawn once, at plan time, and stored.
 //
 // Version 2's codes did not exist before the switch, so a B code in an answer
-// proves the model had B, and an A code after the switch means the user was told
-// the old thing. Which version each FETCH got is read afterwards from our log
+// proves the model had B, and an A code after the switch means the person asking was
+// told the old thing. Which version each FETCH got is read afterwards from our log
 // (etag_sent), against the tags the control reported. "Fetched B, answered A" is
 // kept distinct from ordinary stale reuse.
 //
@@ -776,7 +776,7 @@ func planCorrection(base, localOrigin string, provs []Caller, formats []string, 
 	}
 	if start.After(now) {
 		fmt.Printf("[correction] first warm-up slot: %s (a loop started now waits until then)\n",
-			start.In(time.FixedZone("KSA", 3*3600)).Format("Mon 02 Jan 15:04 KSA"))
+			start.UTC().Format("Mon 02 Jan 15:04 UTC"))
 	}
 	pages, err := buildCorrectionPages(provs, base, runID, correctionLayout{
 		Formats: formats, Trials: trials, Size: size, Checks: reask,
@@ -810,10 +810,9 @@ func planCorrection(base, localOrigin string, provs []Caller, formats []string, 
 	fmt.Printf("[correction] %d paid asks in total (each page: 1 warm-up + 1 ask-again)\n", asks)
 	fmt.Printf("[correction] warm-up question : %s\n", correctionWarmQuestion)
 	fmt.Printf("[correction] ask-again question: %s\n", correctionReaskQuestion)
-	fmt.Println("[correction] pages (warm-up time KSA, check, drawn wait):")
-	ksa := time.FixedZone("KSA", 3*3600)
+	fmt.Println("[correction] pages (warm-up time UTC, check, drawn wait):")
 	for _, pg := range pages {
-		wu := time.Unix(int64(pg.WarmDueUnix), 0).In(ksa)
+		wu := time.Unix(int64(pg.WarmDueUnix), 0).UTC()
 		fmt.Printf("  %-13s %-4s t%d  warm %s  check %-4s wait %s\n", pg.Provider, pg.Format, pg.Trial,
 			wu.Format("Mon 15:04"), compactDur(mustDur(pg.Reasks[0].Offset)), pg.Reasks[0].Wait)
 	}
@@ -980,7 +979,7 @@ func reportCorrection(st *CorrectionState, recs []probe.Record) int {
 
 // parseStartAt reads -correction-startAt: when a sitting's first warm-up slot
 // is. Empty = now. The time must carry an explicit zone (a bare "10:00" is
-// ambiguous between Riyadh and UTC), and a time in the past or more than 30 days
+// ambiguous between local time and UTC), and a time in the past or more than 30 days
 // out is refused as a likely typo.
 func parseStartAt(s string, now time.Time) (time.Time, error) {
 	if strings.TrimSpace(s) == "" {

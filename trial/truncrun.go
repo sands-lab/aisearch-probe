@@ -120,7 +120,7 @@ type TruncAction struct {
 // buildTruncActions is the pure plan (no network): Part A one scan per
 // (provider, size); Part B a warm+reask pair per (provider, size) on its OWN page.
 // The size is in the path and the page id is unique per (provider, run, part, size).
-// routePrefix is the generated-page route to hit (default "/depthpage/"); the format
+// routePrefix is the generated-page route to hit (default "/depth/html/"); the format
 // variants (/depth/txt/, /depth/pdf/, /depth/docx/) serve the same markers
 // in another format. partAOnly builds only the "scan" (cut-locating) ask and skips
 // the Part B warm+reask — the cheap read-depth smoke that avoids Part B's cost.
@@ -173,7 +173,7 @@ func truncEmit(runID string, a *TruncAction, secret string, force bool) {
 	// Self-identify the dynamic-filtering A/B cells: record the pinned Anthropic web_fetch
 	// version when one is set (A = web_fetch_20250910 no-DF, B = web_fetch_20260209 DF).
 	// ONLY on the DIRECT anthropic caller — the override does not affect the OpenRouter
-	// path (C), so labelling it there would be wrong. See doc/dynamic-filtering-cost-method.md.
+	// path (C), so labelling it there would be wrong. See docs/experiments/dynFilter.md.
 	if anthropicFetchVersionOverride != nil && a.Provider == "anthropic" {
 		extra["web_fetch_version"] = *anthropicFetchVersionOverride
 	}
@@ -276,7 +276,7 @@ func fireTruncAction(a *TruncAction, p Caller, secret string, force bool) {
 	time.Sleep(20 * time.Second) // let a fetch land
 	recs, _, _ := probe.LoadRecords(probeLogPath, "", time.Time{})
 	a.Fetches = countHits(recs, a.PageID, hostOfURL(a.URL), a.FiredUnix, 150)
-	// WATCH (see doc/cache-scope-framework.md § pause_turn): one task should fetch
+	// WATCH (pause_turn): one task should fetch
 	// once. A resumed turn should reuse the round-1 fetch, not re-fetch — more than
 	// one hit means a genuine within-call duplicate fetch, not caching.
 	if a.Fetches > 1 {

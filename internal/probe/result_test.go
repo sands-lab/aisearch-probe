@@ -23,7 +23,7 @@ func goldenResult() ResultRecord {
 		Vendor:        "or:anthropic",
 		Model:         "anthropic/claude-sonnet-5",
 		ToolForced:    true,
-		URL:           "https://probe.attentionhub.org/fault/heal/60?probe=tok",
+		URL:           "https://probe.example.org/fault/heal/60?probe=tok",
 		Token:         "probe=tok",
 		SentUTC:       "2026-09-22T10:10:10Z",
 		SentUnix:      1789999810.5,

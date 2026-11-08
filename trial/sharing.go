@@ -82,8 +82,7 @@ const (
 	sharingLateDepth = 75
 )
 
-// sharingAskQuestion is the standard question (standardQuestion, DECISIONS.md
-// § D14): one named marker. The page labels each marker "…for the section at
+// sharingAskQuestion is the standard question (standardQuestion): one named marker. The page labels each marker "…for the section at
 // depth=N%", so the phrase points at exactly one code. Kept as a name because the
 // sharing, leak, websharing, correction and heal runners call it; the wording lives
 // only in standardQuestion.
@@ -187,7 +186,7 @@ func validateSharingPair(a, b Caller, userA, userB string, baseline bool) error 
 	case !baseline && same:
 		return errors.New("the two callers are identical. Differ by at least one of: a different account\n" +
 			"  (direct key vs or:vendor), a different MODEL at one vendor (address by Tag, e.g.\n" +
-			"  or:openai-gpt-5-mini), or different -sharingApi-firstUser/-sharing-second-user —\n" +
+			"  or:openai-gpt-5-mini), or different -sharingApi-firstUser/-sharingApi-secondUser —\n" +
 			"  or pass -sharingApi-run-sameCaller for the within-account reference")
 	}
 	return nil
@@ -195,7 +194,7 @@ func validateSharingPair(a, b Caller, userA, userB string, baseline bool) error 
 
 // sharingLockPath gives each comparison its own lock, so different comparisons
 // run side by side while the same one cannot be started twice. The pages are
-// generated per run, so none of them touches probe-site/.
+// generated per run, so none of them touches site/.
 func sharingLockPath(a, b Caller, userA, userB string) string {
 	name := a.Tag() + "--" + b.Tag()
 	if userA != "" || userB != "" {
@@ -233,7 +232,7 @@ func runSharing(base, secret string, first, second Caller,
 		fmt.Printf("  PER-USER MODE: first caller user=%q, second caller user=%q (sent via OpenRouter's user field)\n\n", firstUser, secondUser)
 	}
 	if base == "" {
-		fmt.Fprintln(os.Stderr, "error: -siteUrl (the origin, e.g. https://probe.attentionhub.org) is required")
+		fmt.Fprintln(os.Stderr, "error: -siteUrl (the origin, e.g. https://probe.example.org) is required")
 		return 1
 	}
 	if secret == "" && !dryRun {

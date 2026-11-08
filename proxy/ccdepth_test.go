@@ -122,11 +122,11 @@ func TestCcDepthNeedsTheSecret(t *testing.T) {
 	}
 }
 
-// No real file under probe-site/ may shadow the reserved prefix.
+// No real file under site/ may shadow the reserved prefix.
 func TestNoRealPageShadowsTheCcDepthPrefix(t *testing.T) {
 	entries, err := os.ReadDir("../site")
 	if err != nil {
-		t.Fatalf("read probe-site: %v", err)
+		t.Fatalf("read site: %v", err)
 	}
 	for _, e := range entries {
 		name := strings.ToLower(e.Name())

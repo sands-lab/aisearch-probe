@@ -29,7 +29,7 @@ import (
 // waits overlap, so a sitting costs little more than the pasting.
 //
 // Storage: the replies go to the web-trial raw log (logs/web-trials/raw/<run>.jsonl,
-// phase "sharing", same format as -webtrial), the steps to
+// phase "sharing", the standard record format), the steps to
 // logs/sharing-redo/web-<run>.jsonl, and the standard records with surface web-app.
 
 type webSharingConfig struct {
@@ -211,7 +211,7 @@ func runWebSharing(cfg webSharingConfig) int {
 
 	in := bufio.NewReader(os.Stdin)
 	// Say the running order up front: the parts go across ALL apps, which is not
-	// obvious and caught the user out on 2026-10-11.
+	// obvious and caught a person out once.
 	fmt.Print(webSharingOrder(cfg.apps, cfg.gap))
 	fmt.Print("  press ENTER to begin… ")
 	_, _ = in.ReadString('\n')
@@ -324,7 +324,7 @@ func webSharingAsk(in *bufio.Reader, n int, acct, app string, s sharingPlanStep,
 		Config: fmt.Sprintf("sharing/%s:%s/step%d", acct, s.user, n), PageURL: s.url,
 		Marker: s.want, Reply: reply,
 	}
-	// Same ask-first handling as -webtrial: one fixed confirmation line.
+	// Ask-first handling: one fixed confirmation line.
 	if webYesNo(in, "  did the app ask a question / for permission instead of answering?") {
 		raw.AskedBack = true
 		if webYesNo(in, "  reply with the standard confirmation ("+standardConfirmReply+") and continue?") {

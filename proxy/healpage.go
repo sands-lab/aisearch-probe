@@ -16,7 +16,7 @@ import (
 )
 
 // THE HEALABLE PAGE — one address that fails until the control fixes it, for the
-// remembered-failure test (doc/handoff-cacheheader-day2-and-heal.md Part 2): after a
+// remembered-failure test (docs/experiments/heal.md): after a
 // broken page recovers, how long does a vendor keep answering "it's broken"?
 //
 // WHY A CONTROL, NOT A TIMER. The old /fault/heal/<sec> heals a set time after the
@@ -39,7 +39,7 @@ import (
 // changeable page's version 1 is the depth page. Its codes are unique to the page
 // because every run uses a fresh id. Last-Modified is the flip time (a fixed date
 // could answer a date-only revalidation with a 304 for a page that never had a 200);
-// otherwise it is the normal page (no Cache-Control, no Expires; DECISIONS.md § D13).
+// otherwise it is the normal page (no Cache-Control, no Expires).
 //
 // AN ID NEVER CREATED IS A PLAIN 404 ("404 page not found"), never a silent broken
 // page, so a mistake on our side — a runner asking about an id it never made, or a

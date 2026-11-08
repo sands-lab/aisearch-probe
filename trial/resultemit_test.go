@@ -22,7 +22,7 @@ func TestResultFromAskCarriesAnswer(t *testing.T) {
 		Marker:     "RCP-2026-08",
 	}
 	o := askOutcome{
-		URL:             "https://probe.attentionhub.org/fault/heal/60?probe=tok",
+		URL:             "https://probe.example.org/fault/heal/60?probe=tok",
 		Token:           "probe=tok",
 		Question:        "Caching check 15m. What is the study reference code on this page?",
 		Answer:          "I attempted to fetch the page but the tool returned a 503 error. reference code: <unavailable>",

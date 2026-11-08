@@ -16,7 +16,7 @@ import (
 // This is xAI as a first-class customer, separate from the OpenRouter x-ai
 // route (openrouter.go). The two are UNRELATED accounts reaching one vendor,
 // which is what the cross-account sharing test needs: does one account's
-// download serve another account's question? See doc/xai-direct-provider-handover.md.
+// download serve another account's question?
 //
 // The shape is OpenAI's Responses API: xAI serves an OpenAI-compatible
 // /v1/responses, so this mirrors openaiVendor. The one tool that matters is
@@ -32,8 +32,7 @@ import (
 // tool is present but not forced we still pin "auto", because xAI's API may
 // otherwise leave the tool unused and answer from its own knowledge silently.
 //
-// Attribution caveat, MEASURED (PROVIDERS.md § "xAI's fetcher does not identify
-// itself"): xAI's fetcher forges ordinary-browser user-agents and fires several
+// Attribution caveat, MEASURED (xAI's fetcher does not identify itself): xAI's fetcher forges ordinary-browser user-agents and fires several
 // requests per ask. So a fetch is attributed by the per-provider probe TOKEN in
 // the URL, never by user-agent. -checkVendors must confirm a request actually reaches
 // us before any result is believed.

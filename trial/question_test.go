@@ -12,19 +12,18 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// THE QUESTION RULE (DECISIONS.md § D14, the user, 2026-10-25). Every runner asks
-// standardQuestion(depth). Any other wording needs the user's approval FIRST, with its
-// reason, recorded in DECISIONS.md — never just a code comment. This registry lists
+// THE STANDARD-QUESTION RULE. Every runner asks standardQuestion(depth). Any other
+// wording is an exception that needs a stated reason. This registry lists
 // every question declared in the runners (any const, var, func or method whose name
 // contains "question") with its status:
 //
 //	standard   asks standardQuestion (checked word for word below)
-//	exception  a different wording the user approved, with the reason, in D14
-//	legacy     an old test the user approved keeping as is (D14); new runs never use it
+//	exception  a different wording, with the reason given below
+//	legacy     an older wording kept as is; new pages never use it
 //	selector   only picks among the questions above; holds no wording of its own
 //
 // A new declaration that is not listed fails TestEveryQuestionIsRegistered. Adding it
-// here is the step that must wait for the user's approval and a DECISIONS.md entry.
+// here is the step that needs a stated reason.
 var questionRegistry = map[string]string{
 	// standard
 	"trial standardQuestion":        "standard",
@@ -35,11 +34,11 @@ var questionRegistry = map[string]string{
 	"trial correctionWarmQuestion":  "standard",
 	"trial correctionReaskQuestion": "standard",
 	"trial rotatedQuestion":         "standard",
-	// approved exceptions (D14): the question is itself the measurement, or the page
+	// exceptions: the question is itself the measurement, or the page
 	// is not ours / has no depth codes
 	"trial truncScanQuestion": "exception", // read-depth part A: every code, to see how far down it read
 	"trial faultQuestion":     "exception", // fault test: what the page says + every code
-	// legacy (D14): an older wording kept for pages without depth codes
+	// legacy: an older wording kept for pages without depth codes
 	"trial ttlmapQuestion": "legacy",
 }
 
@@ -101,7 +100,7 @@ func TestEveryQuestionIsRegistered(t *testing.T) {
 	for _, name := range found {
 		seen[name] = true
 		if _, ok := questionRegistry[name]; !ok {
-			t.Errorf("%s is a question not in the registry. A wording other than standardQuestion needs the user's approval and a DECISIONS.md entry (§ D14) before it is listed here", name)
+			t.Errorf("%s is a question not in the registry. A wording other than standardQuestion needs a stated reason before it is listed here", name)
 		}
 	}
 	var stale []string

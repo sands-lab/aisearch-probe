@@ -13,7 +13,7 @@ import (
 //
 // The preflight answers a question about a *route* — does provider P, with model
 // M and tool T, actually cause that vendor's own fetcher to retrieve a page? —
-// and that answer does not change between runs. Re-running run-pilot.sh six
+// and that answer does not change between runs. Re-running a shell script six
 // times in an afternoon paid for the same validation six times.
 //
 // THE TRIALS ARE NEVER CACHED, and must not be. A trial's whole purpose is to be

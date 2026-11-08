@@ -77,8 +77,8 @@ func withBlind(noTools bool, fn func()) {
 }
 
 // buildPrompt is the whole prompt every API runner sends: the address on its own
-// line, a blank line, then the question, and nothing else (DECISIONS.md D14). Any
-// added wording needs the user's approval first; TestPromptIsAddressAndQuestion
+// line, a blank line, then the question, and nothing else (the standard-question rule). Any
+// added wording is a deliberate change; TestPromptIsAddressAndQuestion
 // pins the bytes.
 //
 // Until 2026-10-28 it also wrapped the question ("Fetch <url> and answer from that
@@ -145,8 +145,7 @@ func truncate(s string, n int) string {
 // The API is stateless, so Continue resumes by appending the partial assistant
 // turn (which carries the web_fetch_tool_result verbatim), and the shared driver
 // POSTs again until "end_turn". That resend is intra-call plumbing, NOT a cache
-// rung: the content is reused only because we resend it. See
-// doc/cache-scope-framework.md § pause_turn.
+// rung: the content is reused only because we resend it.
 // ---------------------------------------------------------------------------
 
 type anthropicVendor struct{}
@@ -165,8 +164,7 @@ func (anthropicVendor) Auth(_ context.Context, key string) (map[string]string, e
 // Non-nil switches the tool to web_fetch_20260309 (the first version that accepts
 // use_cache; verified 2026-10-03) and sets use_cache explicitly. It is a package global
 // toggled around a single call via withAnthropicCache, exactly like blindNoTools; the
-// driver is sequential so there is no race. TODO (same cleanup as withBlind, see
-// TODO.md § Instrument): fold both into a proper per-call option on the Vendor layer.
+// driver is sequential so there is no race. A later cleanup could fold both into a proper per-call option on the Vendor layer.
 var anthropicUseCacheOverride *bool
 
 func withAnthropicCache(on bool, fn func()) {

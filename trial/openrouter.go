@@ -27,8 +27,7 @@ import (
 //     the page. If it does not say ChatGPT-User / Claude-User / PerplexityBot
 //     etc., the passthrough is not happening and the run means nothing.
 //
-// See PROVIDERS.md for the pricing and the calibration plan against the direct
-// OpenAI and Anthropic accounts.
+// The direct OpenAI and Anthropic accounts are the calibration for this route.
 
 const openRouterBase = "https://openrouter.ai/api/v1"
 
@@ -48,8 +47,7 @@ var openRouterUser string
 //	                         would be about OpenRouter. Use the DIRECT Gemini
 //	                         API instead — that needs GCP billing enabled.
 //	perplexity/sonar-pro   — rejects tools outright and reaches the web only
-//	                         through its own index. Out of scope; see
-//	                         FINDINGS.md § Scope.
+//	                         through its own index. Out of scope.
 //
 // Add either back with -openrouterModels if the situation changes, but re-read
 // the "who fetched" line before believing the numbers.
@@ -58,7 +56,7 @@ var openRouterUser string
 // bill. The task is: fetch one page, answer one easy question, quote the code
 // at the bottom. It does not need a frontier model, and the study needs every
 // square of its grid filled more than once. Prices below are per million
-// tokens, read from OpenRouter's model list on 2026-09-13; see PROVIDERS.md.
+// tokens, read from OpenRouter's model list on 2026-09-13.
 //
 // The model each one replaced is kept in largeOpenRouterModels: whether a big
 // and a small model at one vendor share a stored copy is its own question, and
@@ -115,7 +113,7 @@ func vendorOf(slug string) string {
 //	            web_fetch     OpenRouter-WebFetch arrived — WRONG PARTY
 //	anthropic   web_fetch     Claude-User arrived (and fetched robots.txt first)
 //	            web_search    nothing arrived — search cannot find an unindexed URL
-//	x-ai        web_search    fetched, but undeclared (see PROVIDERS.md)
+//	x-ai        web_search    fetched, but undeclared
 //	google      web_search    nothing arrived; web_fetch untried
 //	perplexity  (none)        nothing arrived; Sonar rejects tools entirely
 //

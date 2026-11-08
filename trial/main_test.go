@@ -112,7 +112,7 @@ func TestGoogleVertexRequiresReadableCredentialsFile(t *testing.T) {
 	}
 
 	f := t.TempDir() + "/sa.json"
-	if err := os.WriteFile(f, []byte(`{"client_email":"x@y.iam.gserviceaccount.com","private_key":"k","project_id":"p"}`), 0o600); err != nil {
+	if err := os.WriteFile(f, []byte(`{"client_email":"x-at-y.iam.gserviceaccount.com","private_key":"k","project_id":"p"}`), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", f)
@@ -150,7 +150,7 @@ func TestLoadServiceAccountRejectsWrongFileShape(t *testing.T) {
 
 func TestLoadServiceAccountDefaultsTokenURI(t *testing.T) {
 	f := t.TempDir() + "/sa.json"
-	os.WriteFile(f, []byte(`{"client_email":"x@y.iam.gserviceaccount.com","private_key":"k","project_id":"proj"}`), 0o600)
+	os.WriteFile(f, []byte(`{"client_email":"x-at-y.iam.gserviceaccount.com","private_key":"k","project_id":"proj"}`), 0o600)
 	sa, err := loadServiceAccount(f)
 	if err != nil {
 		t.Fatalf("loadServiceAccount: %v", err)
@@ -199,9 +199,9 @@ func TestMarkerMatchIsCaseInsensitive(t *testing.T) {
 // 0 must be answerable from every page in the site.
 func TestQuestionZeroIsAnswerableFromEveryPage(t *testing.T) {
 	for _, name := range []string{"index.html", "method.html", "metrics.html", "limitations.html"} {
-		page, err := os.ReadFile("../probe-site/" + name)
+		page, err := os.ReadFile("../site/" + name)
 		if err != nil {
-			t.Skipf("probe-site not readable: %v", err)
+			t.Skipf("site not readable: %v", err)
 		}
 		if !strings.Contains(strings.ToLower(string(page)), "reference") {
 			t.Errorf("%s has no study reference code; the repeat arm's question is unanswerable there", name)
@@ -349,7 +349,7 @@ func TestGeminiKeySupersedesVertex(t *testing.T) {
 		t.Setenv(v, "")
 	}
 	f := t.TempDir() + "/sa.json"
-	if err := os.WriteFile(f, []byte(`{"client_email":"x@y.iam.gserviceaccount.com","private_key":"k","project_id":"p"}`), 0o600); err != nil {
+	if err := os.WriteFile(f, []byte(`{"client_email":"x-at-y.iam.gserviceaccount.com","private_key":"k","project_id":"p"}`), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", f)
@@ -474,7 +474,7 @@ func TestGeminiRetrievalFailureIsAnError(t *testing.T) {
 	body := []byte(`{"candidates":[{"content":{"parts":[{"text":
 		"I am sorry, but I am unable to access the requested URL."}]},
 		"urlContextMetadata":{"urlMetadata":[
-		  {"retrievedUrl":"https://x.trycloudflare.com/method.html",
+		  {"retrievedUrl":"https://x.example/method.html",
 		   "urlRetrievalStatus":"URL_RETRIEVAL_STATUS_ERROR"}]}}]}`)
 	if _, err := parseGeminiResponse(body); err == nil {
 		t.Fatal("a URL_RETRIEVAL_STATUS_ERROR response parsed as a valid answer")
@@ -568,14 +568,14 @@ func TestPageLivenessDetectsEachFailure(t *testing.T) {
 func TestRunLockRefusesASecondRun(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".probe-run.lock")
 
-	first, err := acquireRunLock(path, "staleness experiment", []string{"probe-site/staleness.html"})
+	first, err := acquireRunLock(path, "staleness experiment", []string{"site/staleness.html"})
 	if err != nil {
 		t.Fatalf("first run could not take the lock: %v", err)
 	}
 
 	// A second run must be refused, and the message must say what holds it and
 	// which files are at stake — otherwise the operator cannot act on it.
-	_, err = acquireRunLock(path, "retention run", []string{"probe-site/"})
+	_, err = acquireRunLock(path, "retention run", []string{"site/"})
 	if err == nil {
 		t.Fatal("a second run took the lock while the first was live")
 	}
@@ -587,7 +587,7 @@ func TestRunLockRefusesASecondRun(t *testing.T) {
 
 	// Released, the lock must not block anyone.
 	first.Release()
-	second, err := acquireRunLock(path, "retention run", []string{"probe-site/"})
+	second, err := acquireRunLock(path, "retention run", []string{"site/"})
 	if err != nil {
 		t.Fatalf("the lock still blocks after release: %v", err)
 	}
@@ -604,7 +604,7 @@ func TestRunLockIgnoresDebrisFromADeadProcess(t *testing.T) {
 		0o644); err != nil {
 		t.Fatal(err)
 	}
-	l, err := acquireRunLock(path, "retention run", []string{"probe-site/"})
+	l, err := acquireRunLock(path, "retention run", []string{"site/"})
 	if err != nil {
 		t.Fatalf("a dead run's lock blocked a new one: %v", err)
 	}

@@ -19,7 +19,7 @@ import (
 )
 
 // THE REMEMBERED-FAILURE RUN (heal redo) — after a broken page is fixed, how long
-// does a vendor keep answering "it's broken"? (doc/handoff-cacheheader-day2-and-heal.md
+// does a vendor keep answering "it's broken"? (docs/experiments/heal.md
 // Part 2; design agreed 2026-10-22.)
 //
 // Each trial is one fresh healable page (/heal/, proxy/healpage.go) for ONE
@@ -35,13 +35,13 @@ import (
 //
 // One page per check time, a times-2 grid with each wait drawn at random inside its
 // own step, and shuffled first-ask slots: the convention of the correction run
-// (doc/correction-visibility-method.md), whose helpers this reuses (checkWindow,
+// (docs/experiments/correction.md), whose helpers this reuses (checkWindow,
 // drawWait, parseStartAt). Old /fault/heal/<sec> healed a set time after the first
 // request, which several-requests-per-ask vendors blur; here the fix time is ours.
 //
 // NOTHING IS SKIPPED. A failed call, a first ask that never saw the failure, a fixed
 // page fetched before its check, or a changed fix time is NOTED and the page runs to
-// the end (the user's rule: vendors sometimes behave oddly, and the full run is the
+// the end (vendors sometimes behave oddly, and the full run is the
 // record). The report reads each re-ask as fetch yes/no x code yes/no.
 //
 // The questions are the shared ones (sharingAskQuestion, as the sharing and
@@ -728,7 +728,7 @@ func planHeal(a healPlanArgs) int {
 		WarmGap: a.WarmGap.String(), Jitter: a.Jitter, Checks: strings.Join(cs, ","), Fails: fails,
 		AnthropicFetchVersion: a.FetchVersion, Pages: pages,
 	}
-	ksa := time.FixedZone("KSA", 3*3600)
+	utc := time.UTC
 	fmt.Printf("[heal] run %s: %d page(s) = vendors x %d check times x failures %v x %d trial(s); %d B\n",
 		runID, len(pages), len(checks), fails, a.Trials, a.Size)
 	fmt.Printf("[heal] checks after the fix: %s (each drawn inside its step: %v); fix %s after each first answer; first asks every %s, shuffled\n",
@@ -738,13 +738,13 @@ func planHeal(a healPlanArgs) int {
 	fmt.Printf("[heal] first-ask question: %s\n", healWarmQuestion)
 	fmt.Printf("[heal] re-ask question   : %s\n", healReaskQuestion)
 	fmt.Printf("[heal] first slot %s, last slot %s\n",
-		start.In(ksa).Format("Mon 02 Jan 15:04 KSA"),
-		start.Add(time.Duration(len(pages)-1)*a.WarmGap).In(ksa).Format("Mon 02 Jan 15:04 KSA"))
+		start.In(utc).Format("Mon 02 Jan 15:04 UTC"),
+		start.Add(time.Duration(len(pages)-1)*a.WarmGap).In(utc).Format("Mon 02 Jan 15:04 UTC"))
 	if a.DryRun {
 		for _, pg := range pages {
 			fmt.Printf("  %-13s fail=%s check=%-4s wait %-8s first ask %s  %s\n", pg.Provider, pg.Fail,
 				compactDur(mustDur(pg.Reask.Check)), pg.Reask.Wait,
-				time.Unix(int64(pg.WarmDueUnix), 0).In(ksa).Format("15:04:05"), pg.URL)
+				time.Unix(int64(pg.WarmDueUnix), 0).In(utc).Format("15:04:05"), pg.URL)
 		}
 		fmt.Println("[heal] DRY RUN — no state written, no API call.")
 		return 0

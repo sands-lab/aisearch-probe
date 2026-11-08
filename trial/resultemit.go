@@ -12,7 +12,7 @@ package main
 // The record holds FACTS only: what we sent, what came back, and the token that
 // links it to the raw server log. It carries no verdict and no authoritative
 // fetch count — those are DERIVED later by joining Token against probe.jsonl.
-// See internal/probe/result.go and doc/standard-record-interface-handover.md.
+// See internal/probe/result.go.
 
 import (
 	"fmt"
@@ -42,7 +42,7 @@ type askOutcome struct {
 	ElapsedS             float64
 	FetchesSnapshot      int
 	// Token usage = the call's cost (a fact; dollars derived later from
-	// PROVIDERS.md). Every runner should set these from the provider's Usage.
+	// the vendors' prices). Every runner should set these from the provider's Usage.
 	InputTokens  int
 	OutputTokens int
 	// Rounds is the number of request rounds the call took (1 normally; >1 is an

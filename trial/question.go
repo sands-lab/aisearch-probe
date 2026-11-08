@@ -6,9 +6,9 @@ import "fmt"
 // wrapper (buildPrompt): it names one of the page's depth codes, so "the answer
 // carries that code" proves the model read THAT page. Only the depth varies.
 //
-// THE RULE (DECISIONS.md § D14, the user, 2026-10-25): every runner uses this
-// wording. A runner that needs to ask anything else must get the user's approval
-// first, with its reason, recorded in DECISIONS.md — a code comment is not enough.
+// THE STANDARD-QUESTION RULE: every runner uses this wording. A runner that asks
+// anything else is an exception that must be listed, with its reason, in the
+// registry in question_test.go.
 // TestEveryQuestionIsRegistered (question_test.go) lists every question declared in
 // the runners with its status and fails on one that is not listed, so a new wording
 // cannot slip in unreviewed.

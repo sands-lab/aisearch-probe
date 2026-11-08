@@ -24,7 +24,7 @@ func orEnv(val, key string) string {
 // This exists because `source ~/.config/probe-trial/env` does NOT work the way
 // it looks like it does: sourcing a file of plain KEY=value lines sets shell
 // variables but does not export them, so a child process sees nothing and the
-// tool silently reports no credentials. run-pilot.sh avoids that with `set -a`;
+// tool silently reports no credentials. a shell script avoids that with `set -a`;
 // running the binary directly had no such protection.
 //
 // Values already present in the environment win, so an explicit export still

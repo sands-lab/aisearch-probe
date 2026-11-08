@@ -39,39 +39,19 @@ func runConcurrent(n, workers int, fn func(i int)) {
 	wg.Wait()
 }
 
-// THE TTL-MAP runner (client side).
+// THE CACHE-HEADER TEST runner (client side; records are tagged "ttlmap").
 //
-// The question (TODO.md § "Does cache TTL differ between MODELS of the same
-// vendor"): does one vendor hand two of its models the SAME copy lifetime? Same
-// TTL points to one URL-keyed cache behind all the vendor's models; different TTL
-// points to per-model caches. It also corroborates the cross-model SHARING finding
-// (Results 12/13): those models already share the stored copy, so if they also
-// share the TTL it is provably one cache.
+// METHOD. Ask once about N fresh /cacheHeaders/ pages at once, one per caching-
+// header setting, then ask about each again at the -cacheHeaders-askAgainTimes
+// gaps, and for each page record the FIRST gap at which a fetch reaches our
+// server (read from the server log). That first re-fetch is that copy's
+// lifetime under those headers, graded against what RFC 9111 allows.
 //
-// METHOD (the shape of Result 4 and the robots-ttl poller, at minute scale for
-// content pages). Warm N fresh /page/<id> pages at once, then ask about all of
-// them on a fixed cadence, and for each page record the FIRST gap at which a fetch
-// reaches our origin (read from probe.jsonl). That first re-fetch is that copy's
-// lifetime. Polling does not extend the copy (Result 7, OpenAI: the clock runs
-// from the download, not from use), so one page yields one clean TTL and the N
-// pages poll in parallel — the whole map is one session.
-//
-// DISCIPLINE (the confound that bit the object-size sweep, where a header effect
-// was assumed and never tested): only the MODEL varies. Page size, the (normal)
-// header and the /page/ route are held fixed, so a TTL difference can only be the
-// model. Run it once per model (Stage 1 gpt-5-mini, Stage 2 gpt-5.5) by passing a
-// different -openaiModel; the runner reads the active provider set as given.
-//
-// GROUND TRUTH is the FETCH in our log, never the answer text. The page prints a
-// site-wide reference code, so marker-present only confirms the model saw A page,
-// not THE page; the unique page id in the URL is what countHits joins on. This is
-// the same rule retention and negcache follow.
-//
-// This runner is DRIVER-ONLY: /page/<id> already exists (proxy/pages.go), so there
-// is no origin change to deploy and the content freeze cannot block it. It emits
-// only the standard result record (internal/probe.ResultRecord, experiment
-// "ttlmap"); the TTL per page is DERIVED from the fetch join, printed here as a
-// live convenience and re-derivable from logs/results.
+// GROUND TRUTH is the FETCH in our log, never the answer text alone; the unique
+// page id in the URL is what countHits joins on. The runner emits the standard
+// result record (internal/probe.ResultRecord, experiment "ttlmap"); the lifetime
+// per page is DERIVED from the fetch join, printed here as a live convenience and
+// re-derivable from logs/results.
 
 // ttlmapQuestion asks for facts carried in the resource, so an answer with no fetch
 // is a genuine cache hit, not a guessed reply. It is FORMAT-NEUTRAL on purpose: the
@@ -94,7 +74,7 @@ func rotatedDepth(ask int) int {
 }
 
 // rotatedQuestion asks for exactly one named code.
-// Since 2026-10-25 it is the standard question (DECISIONS.md § D14); 14–21 Oct runs
+// Since 2026-10-25 it is the standard question (the standard-question rule); 14–21 Oct runs
 // asked "quote exactly the code that is the reference marker for the section at
 // depth=N%" — the same meaning, recorded in their result records.
 func rotatedQuestion(pct int) string {
@@ -113,8 +93,7 @@ func (pg *ttlPage) askFor(ask int) (question, marker string) {
 		// A depth page checked against one code: ask for exactly that code.
 		return standardQuestion(*pg.standardDepth), pg.Marker
 	}
-	// Legacy pages without depth codes (/page/, the old /depthpage/ size sweep):
-	// DECISIONS.md § D14 keeps their original question.
+	// Pages without depth codes keep the older question.
 	return ttlmapQuestion, pg.Marker
 }
 
@@ -188,8 +167,8 @@ func ttlPollGaps(firstPoll, cadence, window time.Duration) []time.Duration {
 }
 
 // ttlArm is one route under test: a label and how to turn a page id into the URL
-// to poll. The header-TTL sweep runs several arms in ONE session so they are
-// directly comparable (same model, same day); the default run is one arm on /page/.
+// to poll. The cache-header test runs all its arms in ONE session so they are
+// directly comparable (same model, same day).
 //
 // Code is how the arm's read is judged. Most arms leave it nil and the read keys on
 // the global site-wide marker (-marker). The object-type arms set it: each page

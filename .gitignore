@@ -12,3 +12,7 @@ bin/
 secrets/
 
 __pycache__/
+
+# go build inside a package folder
+/trial/trial
+/proxy/proxy

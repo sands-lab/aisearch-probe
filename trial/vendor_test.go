@@ -171,7 +171,7 @@ func TestVendorAuthHeaders(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // The prompt every non-blind vendor sends is EXACTLY the address, a blank line and
-// the question — no wrapper words before or after (DECISIONS.md D14). Checked on
+// the question — no wrapper words before or after (the standard-question rule). Checked on
 // the bytes inside each vendor's own request body.
 func assertNormalPrompt(t *testing.T, prompt, pageURL, question string) {
 	t.Helper()

@@ -6,7 +6,7 @@ package probe
 // measurement is wrong: the origin that PRINTS the markers (proxy/depthpage.go), the
 // runner that ASKS for them (trial/truncrun.go), and the analysis that READS them.
 // If any two drifted, a returned code would map to the wrong depth and the cut would
-// be misread. See doc/truncation-depth-probe-handover.md.
+// be misread. See docs/experiments/readDepth.md.
 //
 // A marker is DepthMarkerPrefix + DepthCode(...). The code is HMAC(secret, id|dP|vN)
 // — the same construction as the coded pages (CpageCode), keyed on the DEPTH via the

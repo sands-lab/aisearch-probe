@@ -33,11 +33,11 @@ var (
 	quietFlag        = flag.Bool("quiet", false, "Suppress the live per-request console line")
 	noCheckFlag      = flag.Bool("skipSelfCheck", false, "Skip the origin validator self-check on startup")
 	serveFlag        = flag.String("serveDir", "", "Serve pages from this directory instead of proxying (use instead of -proxyTo)")
-	ccFlag           = flag.String("cacheControl", "", "Cache-Control sent with the static probe-site/ pages (-serveDir mode only). Default: none, the normal page (DECISIONS.md § D13). Generated pages ignore it")
+	ccFlag           = flag.String("cacheControl", "", "Cache-Control sent with the static site/ pages (-serveDir mode only). Default: none, the normal page. Generated pages ignore it")
 	robotsSecretFlag = flag.String("controlSecret", os.Getenv("PROBE_CONTROL_SECRET"),
 		"Password for the page controls, POST /control/correction and /control/heal (-serveDir mode only; empty = controls disabled)")
 	pageCodeSecretFlag = flag.String("pageCodeSecret", os.Getenv("PROBE_PAGE_CODE_SECRET"),
-		"Secret key for the unforgeable per-page codes on /cpage/ (-serveDir mode only; empty = /cpage/ route disabled)")
+		"Secret key for the unforgeable per-page codes on the depth pages (-serveDir mode only; empty = those pages answer 503)")
 	versionStateFlag = flag.String("correction-serverStateFile", "logs/verpage-state.json",
 		"File holding each changeable page's current version (/correction/html/, /correction/txt/), so a restart keeps it (-serveDir mode only; missing = empty start; \"\" = memory only)")
 	healStateFlag = flag.String("heal-serverStateFile", "logs/heal-state.json",

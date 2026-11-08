@@ -491,12 +491,12 @@ func main() {
 				os.Exit(1)
 			}
 		}
-		// Own lock, not the shared run lock: this touches only generated /depthpage/
+		// Own lock, not the shared run lock: this touches only generated /depth/
 		// addresses. A dry run needs no lock — it makes no address and no call.
 		if *dryRunFlag {
 			os.Exit(runTruncProbe(*urlFlag, active, *pageCodeSecret, *truncprobeMax, sizesOverride, *truncprobeReps, *truncprobeRoute, *forceFlag, true))
 		}
-		lock, lerr := acquireRunLock(truncLockPath, "truncation-depth probe", []string{"generated /depthpage/ addresses (own lock; does not block dev runs)"})
+		lock, lerr := acquireRunLock(truncLockPath, "read-depth test", []string{"generated /depth/ addresses (own lock)"})
 		if lerr != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
 			os.Exit(1)
@@ -515,7 +515,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error: no usable providers")
 			os.Exit(1)
 		}
-		lock, lerr := acquireRunLock(runLockPath, "failure-retry experiment", []string{"probe-site/ (measured pages)"})
+		lock, lerr := acquireRunLock(runLockPath, "failure-retry experiment", []string{"site/ (measured pages)"})
 		if lerr != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
 			os.Exit(1)
@@ -552,7 +552,7 @@ func main() {
 			os.Exit(1)
 		}
 		// Its own lock per comparison: the pages are generated per run (none under
-		// probe-site/), so different comparisons can run side by side.
+		// site/), so different comparisons can run side by side.
 		lock, lerr := acquireRunLock(sharingLockPath(a, b, *sharingFirstUser, *sharingSecondUser), "sharing experiment",
 			[]string{"generated /depth/html/sh-<run>/ addresses"})
 		if lerr != nil {

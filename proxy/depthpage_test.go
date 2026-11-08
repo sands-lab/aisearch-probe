@@ -114,14 +114,14 @@ func TestDepthPageCodesAreUnforgeable(t *testing.T) {
 func TestDepthPageMalformedIs404(t *testing.T) {
 	srv, _, _ := newTestProxy(t, depthServer(t, depthTestSecret), "")
 	for _, p := range []string{
-		"/depthpage/",          // nothing
-		"/depthpage/dp-a",      // no size segment
-		"/depthpage/dp-a/",     // empty size
-		"/depthpage//65536",    // empty id
-		"/depthpage/dp-a/abc",  // non-numeric size
-		"/depthpage/dp-a/0",    // zero
-		"/depthpage/dp-a/-1",   // negative
-		"/depthpage/dp-a/64/9", // extra segment
+		"/depth/html/",          // nothing
+		"/depth/html/dp-a",      // no size segment
+		"/depth/html/dp-a/",     // empty size
+		"/depth/html//65536",    // empty id
+		"/depth/html/dp-a/abc",  // non-numeric size
+		"/depth/html/dp-a/0",    // zero
+		"/depth/html/dp-a/-1",   // negative
+		"/depth/html/dp-a/64/9", // extra segment
 	} {
 		resp := get(t, srv.URL+p, nil)
 		resp.Body.Close()
@@ -135,7 +135,7 @@ func TestDepthPageMalformedIs404(t *testing.T) {
 // corrupted; an absurd size is refused too.
 func TestDepthPageBadSizesAreRefused(t *testing.T) {
 	srv, _, _ := newTestProxy(t, depthServer(t, depthTestSecret), "")
-	for _, p := range []string{"/depthpage/dp-a/64", "/depthpage/dp-a/999999999"} {
+	for _, p := range []string{"/depth/html/dp-a/64", "/depth/html/dp-a/999999999"} {
 		resp := get(t, srv.URL+p, nil)
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {

@@ -17,7 +17,7 @@ import (
 // write their text in with JavaScript; a fetcher that only downloads the HTML never
 // sees it. This is the "JavaScript SEO" test (Vercel/MERJ 2024 found the AI
 // TRAINING crawlers do not run scripts) applied to the question-time fetchers we
-// study. See doc/js-depth-page.md.
+// study. See docs/experiments/javascript.md.
 //
 // Every variant serves the SAME depth lines as /depth/html/ (the plain baseline),
 // so truncrun reads them back unchanged. What differs is how lines past the top get
@@ -29,7 +29,7 @@ import (
 //   - /depth/jsInline/ — the rest is SCRAMBLED inside an inline <script> that
 //     unscrambles it and writes it in. The deeper codes are not in the served bytes
 //     in any readable form, so quoting one means the script RAN (a model reading the
-//     raw script cannot run thousands of keystream steps in its head).
+//     raw script cannot run so many keystream steps in its head).
 //   - /depth/jsExternal/ — same, but the script lives in /depth/jsExternalScript/<id>/<bytes>.js.
 //     Our log then also shows whether the fetcher even REQUESTED the script —
 //     downloading a script is not running it (ClaudeBot does the first, not the second).

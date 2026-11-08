@@ -130,7 +130,7 @@ func TestCacheTokensArePathSafe(t *testing.T) {
 	}
 }
 
-// The design table the user agreed (2026-10-07): what each setting allows a shared
+// The agreed design table: what each setting allows a shared
 // cache, served with the normal version tag and the fixed old last-changed date.
 // This is the grading the report will print, checked end to end.
 func TestEverySettingGradesAsDesigned(t *testing.T) {

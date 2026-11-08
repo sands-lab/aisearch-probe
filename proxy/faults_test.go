@@ -234,12 +234,12 @@ func TestFaultRequestsAreLogged(t *testing.T) {
 	}
 }
 
-// No file named "fault" may exist under probe-site/, or a real page could
+// No file named "fault" may exist under site/, or a real page could
 // shadow the reserved prefix and turn a fault into a normal 200.
 func TestNoRealPageShadowsTheFaultPrefix(t *testing.T) {
 	entries, err := os.ReadDir("../site")
 	if err != nil {
-		t.Fatalf("read probe-site: %v", err)
+		t.Fatalf("read site: %v", err)
 	}
 	for _, e := range entries {
 		if strings.EqualFold(e.Name(), "fault") || strings.HasPrefix(strings.ToLower(e.Name()), "fault.") {
@@ -480,7 +480,7 @@ func TestFaultLoopStopsAtTheHopCap(t *testing.T) {
 // part before the cut, then drops the connection. Through our own reverse proxy
 // the client must see a SHORT body ending in an error — the shallow markers
 // present, the deep ones absent. (Whether cloudflared preserves this is checked
-// live, not here: see doc/fault-injection.md.)
+// live, not here: see docs/experiments/fault.md.)
 func TestFaultCutDeliversAPartialDepthPage(t *testing.T) {
 	srv := newFaultServer(t, faultTestSecret)
 	resp := getRaw(t, srv.URL+"/fault/cut?probe=cutter")

@@ -29,7 +29,7 @@ import (
 // normal page every experiment serves: no Cache-Control, no Expires, an ETag, and
 // Last-Modified = probe.PageLastModified. Only the cache-header test
 // (/cacheHeaders/) may return anything else — a test setting must never leak into
-// another experiment's pages (DECISIONS.md § D13), and
+// another experiment's pages, and
 // TestOnlyTheCacheTestRouteChoosesCacheHeaders enforces it.
 type pageHeaders struct {
 	CacheControl string    // "" omits the header
@@ -40,7 +40,7 @@ type pageHeaders struct {
 
 // genPage is one generated-page route.
 type genPage interface {
-	// prefix is the path prefix this route answers (e.g. "/page/").
+	// prefix is the path prefix this route answers (e.g. "/depth/html/").
 	prefix() string
 	// needsSecret reports whether the route must refuse (503) when no page-code
 	// secret is configured — true for the routes whose markers must be unforgeable.

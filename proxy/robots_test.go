@@ -59,3 +59,28 @@ func TestRobotsFallsBackToAllowAll(t *testing.T) {
 		t.Errorf("robots.txt body %q, want %q", got, builtinRobots)
 	}
 }
+
+// With -robotsCacheControl "" robots.txt is served the normal way: no
+// Cache-Control, an ETag, and a 304 for a matching If-None-Match.
+func TestRobotsNormalWhenNoCacheControlIsSet(t *testing.T) {
+	st := newStaticServer("../site", "")
+	st.robotsCacheControl = ""
+	srv, _, _ := newTestProxy(t, st, "")
+	resp := get(t, srv.URL+"/robots.txt", nil)
+	got := body(t, resp)
+	if !strings.Contains(got, "User-agent: *") {
+		t.Errorf("robots.txt body %q, want the site's own file", got)
+	}
+	if _, ok := resp.Header["Cache-Control"]; ok {
+		t.Errorf("Cache-Control %q, want none", resp.Header.Get("Cache-Control"))
+	}
+	et := resp.Header.Get("ETag")
+	if et == "" || strings.HasPrefix(et, "W/") {
+		t.Fatalf("ETag %q, want a strong one", et)
+	}
+	again := get(t, srv.URL+"/robots.txt", map[string]string{"If-None-Match": et})
+	again.Body.Close()
+	if again.StatusCode != http.StatusNotModified {
+		t.Errorf("If-None-Match with the ETag: status %d, want 304", again.StatusCode)
+	}
+}

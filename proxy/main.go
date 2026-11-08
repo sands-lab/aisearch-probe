@@ -26,14 +26,16 @@ import (
 )
 
 var (
-	originFlag       = flag.String("proxyTo", "", "Origin URL to proxy to, e.g. http://localhost:8080 (required)")
-	portFlag         = flag.Int("port", 8899, "Port this proxy listens on")
-	logFlag          = flag.String("logFile", "logs/probe.jsonl", "Path to the JSONL log file")
-	filterFlag       = flag.String("logOnlyPath", "", "Only log requests whose path starts with this prefix (empty = log all)")
-	quietFlag        = flag.Bool("quiet", false, "Suppress the live per-request console line")
-	noCheckFlag      = flag.Bool("skipSelfCheck", false, "Skip the origin validator self-check on startup")
-	serveFlag        = flag.String("serveDir", "", "Serve pages from this directory instead of proxying (use instead of -proxyTo)")
-	ccFlag           = flag.String("cacheControl", "", "Cache-Control sent with the static site/ pages (-serveDir mode only). Default: none, the normal page. Generated pages ignore it")
+	originFlag   = flag.String("proxyTo", "", "Origin URL to proxy to, e.g. http://localhost:8080 (required)")
+	portFlag     = flag.Int("port", 8899, "Port this proxy listens on")
+	logFlag      = flag.String("logFile", "logs/probe.jsonl", "Path to the JSONL log file")
+	filterFlag   = flag.String("logOnlyPath", "", "Only log requests whose path starts with this prefix (empty = log all)")
+	quietFlag    = flag.Bool("quiet", false, "Suppress the live per-request console line")
+	noCheckFlag  = flag.Bool("skipSelfCheck", false, "Skip the origin validator self-check on startup")
+	serveFlag    = flag.String("serveDir", "", "Serve pages from this directory instead of proxying (use instead of -proxyTo)")
+	ccFlag       = flag.String("cacheControl", "", "Cache-Control sent with the static site/ pages (-serveDir mode only). Default: none, the normal page. Generated pages ignore it")
+	robotsCCFlag = flag.String("robotsCacheControl", defaultRobotsCacheControl,
+		"Cache-Control sent with robots.txt (-serveDir mode only). Default no-store, as the original runs from 15 Sep 2026; \"\" = the normal way (no Cache-Control, an ETag)")
 	robotsSecretFlag = flag.String("controlSecret", os.Getenv("PROBE_CONTROL_SECRET"),
 		"Password for the page controls, POST /control/correction and /control/heal (-serveDir mode only; empty = controls disabled)")
 	pageCodeSecretFlag = flag.String("pageCodeSecret", os.Getenv("PROBE_PAGE_CODE_SECRET"),
@@ -103,6 +105,7 @@ func main() {
 		}
 		st := newStaticServer(*serveFlag, *ccFlag)
 		st.controlSecret = *robotsSecretFlag
+		st.robotsCacheControl = *robotsCCFlag
 		st.pageCodeSecret = *pageCodeSecretFlag
 		versions, err := newVersionState(*versionStateFlag)
 		if err != nil {

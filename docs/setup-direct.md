@@ -51,6 +51,7 @@ the changeable and healable pages' state across a restart.
 | `-controlSecret` | Password for `POST /control/correction` and `POST /control/heal` (default `$PROBE_CONTROL_SECRET`); without it the controls are off |
 | `-correction-serverStateFile`, `-heal-serverStateFile` | Where the correction and heal pages' state is kept |
 | `-cacheControl` | `Cache-Control` on the static files in `-serveDir` only. Leave empty: the test pages never use it |
+| `-robotsCacheControl` | `Cache-Control` on robots.txt. Default `no-store`, as the original servers sent it from 15 Sep 2026. `""` serves it the normal way: no `Cache-Control`, an `ETag` |
 | `-proxyTo`, `-skipSelfCheck` | Sit in front of an existing site instead of serving test pages. Not used by any experiment here |
 
 ## 4. Check it

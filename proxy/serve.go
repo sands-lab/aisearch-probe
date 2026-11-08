@@ -23,9 +23,13 @@ import (
 type staticServer struct {
 	root         http.Dir
 	cacheControl string
-	flaky        *flakyState // per-caller attempt counts for /fault/flaky/N
-	heal         *healState  // per-caller first-sight time for /fault/heal/<sec>
-	loops        *flakyState // per-caller hop counts for /fault/loop/{a,b} (the hop cap)
+	// robotsCacheControl is the Cache-Control sent with robots.txt (default
+	// "no-store", as the original runs from 15 Sep 2026 served it). Empty means
+	// the normal way: no Cache-Control, an ETag. See robots.go.
+	robotsCacheControl string
+	flaky              *flakyState // per-caller attempt counts for /fault/flaky/N
+	heal               *healState  // per-caller first-sight time for /fault/heal/<sec>
+	loops              *flakyState // per-caller hop counts for /fault/loop/{a,b} (the hop cap)
 
 	// controlSecret guards the page controls (correction, heal). The controls
 	// are off unless a secret is set.
@@ -56,7 +60,7 @@ type staticServer struct {
 func newStaticServer(dir, cacheControl string) *staticServer {
 	versions, _ := newVersionState("")   // memory-only never fails; main swaps in the file-backed one
 	healPages, _ := newHealPageState("") // same
-	return &staticServer{root: http.Dir(dir), cacheControl: cacheControl, flaky: newFlakyState(), heal: newHealState(), loops: newFlakyState(),
+	return &staticServer{root: http.Dir(dir), cacheControl: cacheControl, robotsCacheControl: defaultRobotsCacheControl, flaky: newFlakyState(), heal: newHealState(), loops: newFlakyState(),
 		versions: versions, healPages: healPages, startedAt: time.Now().UTC().Truncate(time.Second)}
 }
 
@@ -116,9 +120,9 @@ func (s *staticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// robots.txt is served no-store. See robots.go.
+	// robots.txt: see robots.go for its caching header.
 	if r.URL.Path == "/robots.txt" {
-		s.serveRobots(w)
+		s.serveRobots(w, r)
 		return
 	}
 

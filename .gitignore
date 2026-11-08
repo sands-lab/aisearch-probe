@@ -1,0 +1,14 @@
+# Collected data: run logs, server logs, replies and state files
+logs/
+*.jsonl
+
+# Build output
+bin/
+
+# Secrets: API keys and server passwords
+.env
+.env.*
+*.env
+secrets/
+
+__pycache__/

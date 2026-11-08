@@ -1,0 +1,1796 @@
+# Standing decisions
+
+Decisions that stay true across runs, with the reason and the condition that
+would reverse each one. If a question is settled here, it does not need to be
+re-argued; if the reversal condition is met, act on it.
+
+Each entry: what was decided · why · what would undo it · where it is enforced.
+
+---
+
+## D1 — Google is out of the study until the probe has a real domain name
+
+**Decided** 2026-08-31.
+
+**Google is parked.** Do not include it in runs, results tables, or the
+provider count while the probe is served from `*.trycloudflare.com`.
+
+### Why
+
+Google's `url_context` documentation states its limits outright:
+
+> "Localhost addresses (e.g., localhost, 127.0.0.1), private networks, and
+> **tunneling services (e.g., ngrok, pinggy) are not supported.**"
+
+— [URL context, Gemini API](https://ai.google.dev/gemini-api/docs/url-context),
+retrieved 2026-08-31.
+
+A Cloudflare quick tunnel is exactly that. The measured consequence, 2026-08-31:
+
+| Where we looked | What we saw |
+|---|---|
+| Our server log | `GoogleAgent-URLContext`, **HTTP 200**, full body, 2596 bytes, from verified Google ranges (66.249.93.203, 74.125.208.41, 74.125.211.2) |
+| The model's answer | "I am sorry, but I am unable to access the requested URL … it appears to be blocked or unavailable." |
+
+**This is the dangerous kind of broken.** It does not error out. It produces a
+Google row where a fetch arrives every single round — which analyses as *"Google
+never reuses a cached copy"*. That is a false finding, not a missing one, and an
+earlier draft of `FINDINGS.md` came close to publishing it.
+
+Retrieval is failing, so there is nothing for Google to cache, so it retries. The
+repeated fetches are the failure path, not a cache policy.
+
+### What would undo it
+
+**A real hostname, and nothing else.** Serve the probe from an ordinary domain —
+a subdomain of something we control, or a cheap domain pointed at the box — and
+Google is back in scope with no code change.
+
+Untested middle case: a **named** Cloudflare tunnel on a real domain, where the
+name is real but the transport is still a tunnel. Google's wording is about
+services that hand out throwaway names, so this will probably pass, but that is
+an inference.
+
+**AND THAT TEST CANNOT BE RUN YET, 2026-08-31.** A named Cloudflare tunnel routes
+to a hostname inside a zone in your own Cloudflare account — it *requires* a
+domain. We have none. So the sanity check needs the very thing it was meant to
+avoid needing. `-allow-tunnel-google` stays for the day a domain exists.
+
+What CAN be checked with no domain and no money is the **positive control**: point
+Gemini's `url_context` at an ordinary public URL and confirm the route works at
+all. That isolates the hostname as the cause instead of our prompt, model, or
+tool wiring. `probe-trial -google-control` does exactly this; see D5.
+
+Two ways to get a real hostname, for whenever this is worth unblocking:
+
+| Route | Cost | Notes |
+|---|---|---|
+| A subdomain from Amandio (`…sands.kaust.edu.sa`) | free | already requested; also fixes the missing `ETag` |
+| Any cheap domain + a named Cloudflare tunnel | ~$10/year | needs no administrator and no public IP |
+
+Neither is urgent. Google is one provider of four, and the other three are
+measurable today.
+
+### Where it is enforced
+
+- `parkGoogle` in `trial/providers.go` disables both Google routes when `-url`
+  is a tunnel, localhost, or private address, and prints why.
+- **It keys off the URL, not a flag**, so Google returns *by itself* the moment
+  the hostname is real — nobody has to remember to switch it back on.
+- `TestGoogleIsParkedOnTunnelHostnames` fails if the park is removed, and also
+  fails if a real hostname does *not* re-enable Google.
+- `parseGeminiResponse` reads Gemini's per-URL `urlRetrievalStatus` and turns a
+  non-`SUCCESS` value into an error naming the status, so a blocked retrieval can
+  never again be scored as "the model chose not to fetch".
+
+### For the resource request
+
+This converts the stable-subdomain ask from a convenience into a requirement:
+**it is the difference between four providers and three.** Quote the vendor
+documentation above rather than describing the symptom.
+
+---
+
+## D2 — When our log and the model's answer disagree, the answer wins
+
+**Decided** 2026-08-31, after getting it backwards first.
+
+Our access log records **what our process wrote to its socket** — nothing more.
+A 200 with a byte count is consistent with at least three different worlds:
+
+1. the bytes never reached the provider;
+2. the provider received them and discarded them;
+3. the fetch we saw was unrelated activity by that provider.
+
+Server-side logging from one end cannot separate these. So:
+
+- The **page marker in the answer** is the only evidence that the *model* held
+  the content. A fetch we observed is not a substitute for it.
+- A confirmed fetch must **never** override a missing marker. That override was
+  implemented on 2026-08-31 on the reasoning that a fetch is "harder" evidence,
+  and it was wrong — it silently reclassified the broken Google route as a
+  working one.
+- Where a provider publishes a retrieval status, **read it**. Google does.
+
+Enforced by `trial/check.go` (the `FETCHED BUT NO CONTENT IN ANSWER` branch),
+`routeCache.Put` (only a marker counts as a validated route), and
+`TestRouteNeedsTheContentToReachTheModel`.
+
+---
+
+## D3 — Search-only providers are out of scope, stated as such
+
+A brand-new probe page is in no search index, so a provider that reaches the web
+only through its own index finds nothing and never fetches. Report those as **out
+of scope with the reason**, never as an empty row implying a failed measurement.
+
+**Do not fix this by getting the page indexed.** Once an index holds a copy,
+"nothing reached the server" becomes ambiguous between *the model reused its own
+copy* and *the index served its snapshot* — a third cache we cannot inspect,
+which makes the central negative result unfalsifiable. See `FINDINGS.md § Scope`.
+
+---
+
+## D4 — `probe-site/` content is frozen for the duration of a run, with one page excepted
+
+A changed page changes its fingerprint and forces legitimate re-downloads, which
+read as crawler misbehaviour. Content updates wait until all runs finish. See
+`RUNBOOK.md`.
+
+**The exception is `probe-site/staleness.html`**, added 2026-09-01. Changing it is
+the measurement: it carries an edition line that the driver rewrites mid-run, so
+each answer reveals which version of the page that provider is holding. It is
+excluded from the retention pages and must never be one of them — a page being
+edited cannot also be a page whose re-download counts as crawler behaviour.
+
+---
+
+## D5 — Perplexity is out until a dedicated key exists
+
+**Decided** 2026-08-31.
+
+Perplexity is measurable in principle — the Agent API exposes a `fetch_url` tool,
+unlike the Sonar chat endpoint, which rejects tools and only searches its own
+index. It needs its own `PERPLEXITY_API_KEY`, which no existing credential covers.
+
+Report it as **out of scope pending a credential**, with that reason, never as an
+empty row implying a failed measurement. The driver already skips a provider whose
+key is absent, so nothing needs disabling.
+
+Reversed by: obtaining a key. The code path is written and untested.
+
+---
+
+## D6 — A round is not scored unless we saw our own page during it
+
+**Decided** 2026-08-31, before the first long run.
+
+Every round records what the driver's own GET of the page returned. A round where
+that failed is reported and **excluded from every count**.
+
+### Why this is not optional
+
+The study's finding has this shape: *we asked, nothing arrived at our server, and
+the answer proved the model held our content.*
+
+A page that was simply **unreachable** produces the identical trace. A quick
+tunnel dies with its terminal; a run spanning hours will meet this. The provider
+tries, fails, our server logs nothing, the model answers from its cache — and the
+data says "still cached at T+8h" when what actually happened is that we never
+learned whether it would have re-fetched.
+
+The pilot, finishing in one sitting, was barely exposed to this. **A long run is
+exposed to it constantly, and it is invisible afterwards** — an absent request
+looks the same either way. So it has to be recorded at the time.
+
+A 200 that no longer contains the page marker also fails the check: a recycled
+tunnel address serving someone else's site would otherwise pass.
+
+Enforced by `trial/liveness.go`, the `NOT SCORED` branch in
+`WriteCorrelationReport`, and `TestDeadPageRoundIsNotScoredAsCaching`. Trial logs
+written before this existed are still scored —
+`TestOlderTrialsWithoutLivenessAreStillScored` guards that.
+
+---
+
+## D7 — Every measured URL carries a per-provider token
+
+**Decided** 2026-08-31.
+
+The URL asked of each provider carries `?probe=<provider>`. Two reasons:
+
+1. **Attribution when a fetcher lies.** xAI's fetches arrive with a forged
+   Chrome-on-macOS user-agent from a pool of residential addresses — measured
+   2026-08-31: seven requests in three seconds, seven addresses, four countries.
+   Nothing in the request identifies xAI. The token does, because it was given to
+   xAI and to nobody else and cannot be guessed.
+2. **No cross-provider cache contamination.** Two routes to one vendor share that
+   vendor's cache, so the second legitimately would not fetch — a cache hit
+   caused by us, not by them.
+
+`page_key` strips the query in both collection modes, so a token does not fragment
+one page into many. Verified end to end: a tokenised URL returns the same 3138
+bytes, the same marker, and still answers a conditional request with `304`.
+
+### The safeguard that makes it safe
+
+A fetcher that normalises the URL would arrive **without** its token. Treating a
+missing token as "no fetch" would convert our own measurement gap into the
+study's headline finding. So untokenised arrivals for the page are reported as
+`UNATTRIBUTABLE` — counted as neither a fetch nor a cache hit.
+`TestStrippedTokenIsNotReportedAsCaching` enforces it.
+
+---
+
+## D8 — The CDN objection is answered by arithmetic, not by a dashboard
+
+**Decided** 2026-09-01, after the objection was raised in review.
+
+**The objection.** Our page is published through a Cloudflare tunnel. A CDN is a
+cache. When we ask a provider about the page and nothing arrives at our server,
+an edge that answered from *its* cache looks exactly like a provider reusing its
+own copy. Every reuse observation is ambiguous on its face.
+
+### What does NOT answer it
+
+- **`CF-Cache-Status` in our log.** It cannot fire. If the edge answers from its
+  cache the request never reaches the origin, so no log line exists to carry the
+  header. Measured: empty on all 309 requests. `Record.EdgeServed()` is blind to
+  the thing it appears to guard, and the report must not be read as clearing the
+  CDN because that warning stayed silent.
+- **The Cloudflare dashboard or API.** A quick tunnel lives on Cloudflare's own
+  `trycloudflare.com` zone, which we do not own — no dashboard, no analytics API,
+  no cache-bypass rule. All three become available only with a domain in our own
+  Cloudflare account, which is another argument for D1's stable hostname.
+
+### What does answer it
+
+A shared cache may not serve a response for longer than the freshness the origin
+declared. So compare each reuse against the longest an edge could have held it:
+
+| We served | An edge may hold it |
+|---|---|
+| `no-store` / `no-cache` / `private` | not at all |
+| `max-age=60` | 1 minute |
+| `public, max-age=3600` | 60 minutes |
+
+Any reuse **longer** than that cannot be the edge. `probe-analyze` now reports
+this split for every run (`internal/probe/edge.go`). On the data as of
+2026-09-01: **40 reuse observations, 30 an edge could account for, 10 it cannot**
+— and the 10 are what the findings rest on.
+
+Deliberately biased against ourselves: an observation *inside* the limit is
+reported as edge-explainable even where other evidence makes that implausible, and
+an unrecognised directive counts as explainable rather than as proof.
+
+### The cheap way to remove the doubt entirely
+
+Run retention measurements with `--cache-control 'no-store'`. No shared cache may
+keep the page at all, so no reuse can be blamed on the edge — and it is the
+harsher test, since reuse then violates an explicit instruction. Trade-off: that
+run cannot also measure whether `max-age` is honoured. Do those separately.
+
+
+
+---
+
+## D9 — The cheap model is the default; the expensive one is kept only as a comparison
+
+**Decided** 2026-09-13.
+
+Every run before this date used `openai/gpt-5.5`, `anthropic/claude-opus-4.8` and
+`x-ai/grok-4.6`. The task these models perform is: fetch one page, answer one easy
+question, quote the reference code at the bottom. It does not need a frontier
+model, and the study needs each square of its grid filled more than once.
+
+Defaults are now `openai/gpt-5-mini`, `anthropic/claude-sonnet-5` and
+`x-ai/grok-4.3`. Prices per million tokens, read from OpenRouter's model list on
+2026-09-13 and recorded in `PROVIDERS.md`.
+
+**Anthropic is not on its cheapest model, and the reason is the whole point of
+this decision's guard.** `claude-haiku-4.5` is cheaper, and `-check` showed the
+page being fetched by `OpenRouter-WebFetch` rather than `Claude-User`: OpenRouter
+silently substitutes its own fetcher for a model with no native fetch path, so the
+results would have been about OpenRouter. `claude-sonnet-5` passed the same check.
+
+**This is about more runs, not a smaller bill.** The whole grid costs roughly $13
+either way; the difference is whether an extra repeat has to be justified.
+
+**The model is now also a variable, not only a setting.** Whether a large and a
+small model at one vendor share a stored copy is its own question, so the
+expensive three are kept in `largeOpenRouterModels` and both halves can be run
+together with `-openrouter-models`.
+
+### The failure this could cause, and the guard
+
+A cheaper model that answers from memory rather than calling its tool produces
+"nothing reached the server", which reads as caching and is false.
+`anthropic/claude-opus-5` did exactly that — answered in 1.5 seconds without
+fetching — which is why `4.8` was pinned before. The second way, caught on
+2026-09-13, is an aggregator quietly fetching on the vendor's behalf when the
+cheap model has no native fetch path. Both are invisible in the answer. So: **run
+`-check` after any change to the model list and read the who-fetched line.** The
+comment above `defaultOpenRouterModels` says so at the point of change.
+
+Reversed by: a `-check` showing the vendor's own fetcher no longer arrives for a
+cheap model. Pin that vendor back to its expensive model and record why.
+
+---
+
+## D10 — Each model gets its own address, because a vendor stores one copy per address
+
+**Decided** 2026-09-13. Extends D7 from per-provider to per-provider-and-model.
+
+D7 gave each provider its own `?probe=` token so that two routes to one vendor
+could not satisfy each other's question. Two *models* at one vendor have exactly
+the same problem and it is easier to miss: ask the small model about an address,
+then ask the large one about the same address, and the large one is served the
+copy the small one caused. It never fetches — and that reads as "the large model
+keeps a copy" when it may keep nothing at all.
+
+`Provider.Tag()` is therefore the addressing identity (vendor route **and**
+model), while `Provider.Name` stays the vendor route, because that is what decides
+which fetcher should arrive. `TestTwoModelsAtOneVendorGetDifferentAddresses`
+enforces the split.
+
+**The exception is any experiment where the collision IS the measurement.** The
+sharing experiment hands both callers the identical bare address on purpose, and
+carries a banner saying so. A cross-model sharing experiment must do the same.
+
+Reversed by: nothing foreseeable. If a vendor is shown to store one copy per
+model, the separation costs nothing anyway.
+
+---
+
+## D11 — The `?probe=` code is an opaque handle, minted in one tidy shape
+
+**Decided** 2026-09-22.
+
+The code we put in a URL is a join key, matched as a whole substring of the URL
+against the request log (`correlate.go`). It is NOT a place to read fields out
+of. What each code means — vendor, model, run, and step (warm/reask/broken/
+healthy/control) — is recorded as its own field on the standard result record
+(`internal/probe/result.go`), so analysis never has to take a code apart.
+
+Because of that, the shape of the code is free to be tidy, and it must be.
+Earlier codes came out in inconsistent shapes — a route colon kept here, a dotted
+model version there, a stray trailing colon, mixed case — because callers glued
+qualifiers on with `-` and the minter only flattened three characters. A single
+sanitiser now reduces any identity to one shape: lowercase, letters/digits and
+single hyphens only, no hyphen at either end (`sanitizeTokenField` in
+`trial/probeurl.go`). Every Go producer already mints through `probeToken` /
+`probeURLFor`, so hardening that one function fixes them all.
+`TestProbeTokenIsAlwaysTidy` and `TestProbeTokenShapes` enforce the shape.
+
+Old logs keep their old-shaped codes and cannot be rewritten (append-only). They
+are still attributed by the same whole-string match against the trial log — the
+code was never parsed, so their shape never mattered to analysis. The two shell
+diagnostic labels (`probe=edgecheck`, `probe=cdnwitness`) are tool markers, not
+provider identities, and nothing attributes them; they are left as they are.
+
+Reversed by: a future need to read a field straight off a raw URL without the
+result record in hand. That would call for named query parameters (the UTM
+pattern), not a delimiter packed into one value — and it would replace the
+whole-substring match, so it is a deliberate change, not a drift.
+
+# Runbook
+
+Operating procedure for a measurement run. The rules here exist because
+breaking one of them silently invalidates the data rather than producing an
+obvious error.
+
+## Go lives in ~/.local/go on this host
+
+Go is not on `PATH` here. `run-pilot.sh` finds it at `~/.local/go/bin/go` and
+rebuilds any stale binary itself, so normally there is nothing to do. To build by
+hand:
+
+```
+export PATH="$HOME/.local/go/bin:$PATH"
+go build -o bin/probe-proxy ./proxy
+go build -o bin/probe-trial ./trial
+go build -o bin/probe-analyze ./analyze
+go test ./...
+```
+
+If that directory is ever gone, any Go 1.22+ tarball from go.dev extracted there
+works; the repo has no dependencies.
+
+## The easy path
+
+`./run-pilot.sh` performs every check in this section automatically and refuses
+to start the pilot if one fails. Use it unless you need to drive the pieces
+separately. The checklist below is what it does, and what to do by hand for the
+extended run.
+
+## Known quirk on this network: tunnel hostnames do not resolve locally
+
+`./bin/probe-trial -page-check https://HOST/method.html` answers "can this
+machine reach our own page?" in one line, needs no other flags, and makes no API
+call. Run it first whenever something looks unreachable.
+
+The Go driver now resolves such hostnames over DNS-over-HTTPS itself, so it needs
+no help. `-resolve host:ip` remains an override for a network where
+DNS-over-HTTPS is blocked as well, and `run-pilot.sh` passes it automatically
+whenever it had to resolve that way.
+
+`*.trycloudflare.com` subdomains do not resolve through the local resolver here
+(the apex `trycloudflare.com` does; the random subdomain does not). This is
+almost certainly deliberate filtering of tunnel hostnames.
+
+**It does not break the experiment.** The providers resolve from their own
+networks and reach the page normally — verified: connecting directly to the
+address returned by DNS-over-HTTPS gave HTTP 200 with `cf-cache-status: DYNAMIC`.
+Only local verification is affected.
+
+`run-pilot.sh` handles it: if the system resolver fails it resolves via
+DNS-over-HTTPS against 1.1.1.1 and pins the address with `curl --resolve` for
+every check. To check by hand:
+
+    HOST=<something>.trycloudflare.com
+    IP=$(curl -s -H 'accept: application/dns-json' \
+         "https://1.1.1.1/dns-query?name=$HOST&type=A" \
+         | grep -oE '"data":"[0-9.]+"' | head -1 | grep -oE '[0-9.]+')
+    curl -sI --resolve "$HOST:443:$IP" "https://$HOST/method.html"
+
+A `530` from Cloudflare means the tunnel process is gone, not that the address
+is wrong.
+
+## Google is skipped on this host, on purpose
+
+You will see this on every run from a tunnel hostname:
+
+```
+[trial] PARKED google — x.trycloudflare.com is not a public domain name …
+```
+
+That is correct behaviour, not a problem to fix. Google's `url_context` tool does
+not support tunneling hostnames, and if it ran anyway it would produce a fetch
+every round and a Google row reading "never caches" — a false finding. Full reason
+and the reversal condition: `DECISIONS.md` § D1.
+
+**It un-parks itself** once `-url` uses a real domain name. Nothing to switch on.
+
+`-allow-tunnel-google` exists for one experiment — whether a *named* Cloudflare
+tunnel on a real domain clears the restriction — and that experiment needs a
+domain, which is the thing we do not have. Never use it in a measurement run.
+
+What you *can* check for free, once the tunnel is up:
+
+```
+./run-pilot.sh --google-control          # as part of a run
+./bin/probe-trial -google-control -url https://<host>/method.html
+```
+
+It asks Gemini about an ordinary public page and about ours. Control reads OK and
+ours does not → the hostname is the cause and there is nothing to fix here. Both
+fail → the fault is ours (model, key, quota, tool wiring) and the hostname
+explanation is unproven.
+
+## Cloudflare strips the ETag on this path
+
+Verified on the free plan: the origin sends both an `ETag` and a
+`Last-Modified`, but only `Last-Modified` reaches the client. **The cause is not
+known.** An earlier draft blamed compression; `check-cloudflare.sh` disproved that
+— the `ETag` is absent even when the response is requested with
+`Accept-Encoding: identity`. Do not repeat the compression explanation.
+`run-pilot.sh` detects which validator survives and tests revalidation with that
+one.
+
+**This changes how to read the results.** If crawlers can only revalidate by
+date on this path, a crawler that sends no `If-None-Match` is not
+misbehaving — it has no entity tag to send. Judge them on `If-Modified-Since`,
+and record which validator was available alongside the numbers. The analysis
+already treats either as a valid stamp; the interpretation is what needs care.
+
+## Before touching probe-site/, check the lock
+
+```
+cat logs/.probe-run.lock
+```
+
+If it names a process that is still alive, a run owns those pages. Do not edit
+them and do not start a second run — `run-pilot.sh` and `probe-trial` will both
+refuse anyway. A crashed run's lock is ignored automatically, so it cannot block
+you for ever.
+
+Fetching the pages over HTTP is always safe. `./cdn-witness.sh <host> <HH:MM>`
+samples what Cloudflare hands back, every few minutes, without writing anything —
+run it alongside a live experiment, because the edge's state at a given round
+cannot be recovered afterwards.
+
+## The staleness run is a different experiment on a different page
+
+```
+./run-pilot.sh --staleness --edit-at 5m --schedule 0s,10m,30m,1h,2h
+```
+
+It asks about `/staleness.html`, rewrites that page's edition line at T+5m to a
+value generated at that moment, and keeps asking. Each answer says which version
+the provider is holding, so the round where it flips is how long a published
+change stayed invisible.
+
+Two rules:
+
+- **Only `staleness.html` may be edited during a run**, and only by the driver.
+  It is the one page exempt from the content freeze; every other page changing
+  mid-run invalidates the retention numbers (DECISIONS.md § D4).
+- **The new edition is random, generated at the moment of the edit.** Do not
+  replace it with a fixed value like `EDITION-BRAVO` — a value a model could guess
+  would let it appear to have fetched without fetching.
+
+Afterwards the page is left carrying the new edition; that becomes its resting
+state and the next run generates another.
+
+## Answering "but maybe Cloudflare cached it"
+
+The objection is correct and unavoidable from here: when nothing reaches our
+server, an edge serving its own copy is indistinguishable from a provider serving
+its own. Three things to know.
+
+**The log cannot settle it.** `CF-Cache-Status` only exists on requests that reach
+us, and an edge hit by definition does not. It has been empty on every request
+ever recorded. A silent CDN warning in the report is not a clean bill of health.
+
+**The dashboard is not available.** A quick tunnel is on Cloudflare's own zone,
+not ours — no dashboard, no analytics API, no bypass rule. That needs a domain in
+our own account.
+
+**Arithmetic settles it.** `probe-analyze` prints a `COULD A CDN HAVE CAUSED THESE
+RESULTS?` section: any reuse held longer than the freshness we declared cannot be
+the edge. Read that section before quoting any number.
+
+**And test it directly, per host:**
+
+```
+./cdn-cache-test.sh                    # throwaway probe + tunnel, tests, tears down
+./cdn-cache-test.sh --host <hostname>  # a host already serving
+```
+
+It sends N identical requests from outside and counts how many reach our origin —
+a request the edge served cannot appear there. It tests under `max-age=3600`,
+because proving the edge ignores a page it was forbidden to keep proves nothing
+about the pages we measure, and it includes a stylesheet as a positive control,
+because Cloudflare caches `.css` by default and `.html` never. Run it on the real
+domain when there is one: a normal zone caches far more readily than a quick
+tunnel, and the answer there may differ.
+
+To remove the doubt entirely for one run:
+
+```
+./run-pilot.sh --cache-control 'no-store'
+```
+
+No shared cache may keep the page at all, so every reuse is the provider's. That
+run cannot also measure whether `max-age` is honoured — run those separately.
+
+## Audit the CDN before trusting a result
+
+Run `./check-cloudflare.sh` whenever the delivery path changes, and at least
+once per reporting period. If it exits non-zero, results collected on that path
+cannot distinguish a crawler ignoring a directive from one that never received
+it — fix the path first.
+
+## Serve on port 443
+
+Not a preference. A non-standard port puts a caveat on every result that cannot
+be removed afterwards — a reviewer can ask whether crawlers treat a conventional
+URL differently, and there is no answer unless the conventional case was measured.
+See `PROVIDERS.md` for what each provider documents about ports.
+
+## Two checks that catch silent corruption
+
+Both are automatic in `run-pilot.sh` and both refuse to start a timed run:
+
+- **Who fetched?** The API response says a page was retrieved; it never says by
+  whom. On 2026-08-31 an aggregator fetched on two vendors' behalf while every
+  visible signal read as success — only the server log disagreed. Any route with
+  a middleman must be verified server-side, every run.
+- **Is that fetcher who it claims to be?** Logged client IPs are checked against
+  the operator's published ranges. This is what verified the OpenAI results and
+  what disproved the aggregator's implied identity.
+
+## Before a run
+
+- [ ] **Freeze the page content.** Do not edit anything under `probe-site/`
+      once a run has started. Editing a page changes its fingerprint, which
+      legitimately forces every client to re-download it — and that shows up in
+      the report as crawler misbehaviour when it was your own edit.
+      **All content changes wait until every run is finished.**
+- [ ] Confirm the origin stamps its responses. `probe-proxy` checks this at
+      startup in `-origin` mode; in `-serve` mode it is guaranteed by design.
+      Verify from outside anyway:
+      `curl -sI https://<host>/method.html | grep -iE 'etag|last-modified'`
+- [ ] Confirm the CDN is not answering on your behalf. Run twice:
+      `curl -sI https://<host>/method.html | grep -i cf-cache-status`
+      `HIT` means Cloudflare served it and your server never saw the request.
+      Want `MISS`, `BYPASS`, or `DYNAMIC`.
+- [ ] Record the run's start time and the exact page fingerprints:
+      `curl -sI https://<host>/method.html | grep -i etag`
+- [ ] Back up any existing log before appending to it. Logs are append-only and
+      cannot be regenerated.
+
+## Long runs (over a few hours) — not needed for the pilot
+
+The pilot fits in one sitting and needs none of this. It applies to the extended
+run only.
+
+
+- [ ] **A quick tunnel will not survive.** `cloudflared tunnel --url ...` dies with
+      its terminal and comes back on a *different* address. A run spanning a day
+      needs a named tunnel with a stable hostname, or the later rounds are
+      measuring a different URL than the early ones — which is not the same page
+      as far as any cache is concerned.
+- [ ] Run the probe and the driver under `tmux` (or `nohup`/systemd) so an SSH
+      drop does not end the experiment.
+- [ ] Check the disk has room for the log, and that nothing rotates or cleans it.
+- [ ] **Do not disable the per-round page check.** Every round records what the
+      driver's own GET of the page returned. A round where that failed is printed
+      in red and excluded from every count, because a page that was down leaves
+      exactly the trace of a provider that never asked — which is the study's
+      headline finding. This is the one guard a long run cannot run without;
+      `DECISIONS.md` § D6.
+- [ ] A schedule reaching past the retention window is the point of a long run.
+      The pilot pinned OpenAI at 30–35 minutes from its last fetch and never
+      tested the other vendors past that. Something like:
+
+      ./run-pilot.sh --schedule 0s,30m,1h,2h,4h,8h
+
+      Each round is one call per provider per arm, so at three providers and two
+      arms that is six calls a round.
+- [ ] **Watch for the question-wrap warning.** The rotate arm has a fixed list of
+      questions per page. A schedule with more rounds than questions wraps back to
+      one already asked, and for those rounds the arm no longer rules out a
+      replayed answer. The driver warns at plan time and flags those rounds
+      `question_reused` in the log. Either add questions to `questionsByPage` —
+      answerable from the frozen page text — or keep the schedule within the list.
+
+## During a run
+
+- [ ] Re-check `cf-cache-status` periodically. Contamination can start midway.
+- [ ] If the probe restarts, note the time — a gap in the log is not the same
+      as an absence of crawler traffic.
+
+## After all runs are finished
+
+- [ ] Archive the logs somewhere they cannot be overwritten.
+- [ ] **Then** update the page content if needed. Treat the edit as the end of
+      one measurement period and the start of another; do not compare across it.
+- [ ] Re-record fingerprints after editing, since they will all have changed.
+
+## Choosing the schedule
+
+**Start with the pilot.** The default (`0s,5m,15m,40m`) finishes in about forty
+minutes and is conclusive either way: reuse inside that window is an immediate
+finding, and no reuse is the equally reportable "re-fetched every time at every
+interval tested" — which is itself the evidence for funding a longer run. Get a
+result the same day; widen the schedule once there is budget for it:
+
+    -schedule 0s,15m,1h,6h,24h,72h
+
+Nobody publishes their cache lifetime or eviction policy, so do not guess a
+range — bracket it. Both schedules are log-spaced, each offset roughly three to
+four times the previous. The result you are looking for is
+the boundary: the shortest gap that still produced a fresh fetch, and the
+longest that did not. Evenly spaced probes cluster inside one guess and tell you
+nothing if the true lifetime is an order of magnitude off.
+
+Two cautions:
+
+- Rounds cannot be closer together than a round takes to run. With two providers
+  and two arms at a 30s gap, plus API latency, a round takes several minutes.
+  Offsets closer than that silently collapse and the timing is no longer what
+  the schedule says.
+- Eviction may not be time-based at all — it could be capacity or usage driven,
+  or tied to a crawl schedule. A single observation per interval cannot tell
+  these apart. Treat one run as a probe, not a measurement, and repeat before
+  claiming a lifetime.
+
+## The designed experiment
+
+`-cache-control` on the probe server is the variable you control. Run the same
+schedule at `max-age=60`, then at `max-age=3600`, then at `no-cache`. If the
+observed lifetime tracks what you asked for, they honour cache headers. If it
+does not move, they ignore them and use a policy of their own. That comparison
+is a stronger result than any single run, and it is only possible because the
+pages are yours.
+
+## Interpreting
+
+- Googlebot is the positive control. If it appears not to revalidate, suspect
+  the origin's headers before suspecting the crawler.
+- A bot with no judgeable visits yields no verdict. That is a real outcome, not
+  a missing number.
+- A client that does not re-fetch may have kept the page, or may have reused a
+  previous answer. Vary the question while holding the URL constant to tell
+  those apart — see `probe-trial`.
+
+# Study plan and progress note
+
+Written 2026-09-13. Turns `doc/nextstep.md` into a grid that can be filled in.
+
+The point of this file: today each question has been answered once, on one
+vendor, by one run. That is a demonstration. A study is the same question asked
+of every vendor, more than once, with the empty squares visible.
+
+## Standing decisions for this phase
+
+- **Use the cheapest model that can do the job.** Done 2026-09-13. Defaults are
+  now `openai/gpt-5-mini`, `anthropic/claude-haiku-4.5` and `x-ai/grok-4.3`;
+  prices and the reasoning are in `PROVIDERS.md`, the decision in DECISIONS.md
+  § D9. **Not yet verified with `-check`** — a cheap model that answers without
+  fetching fabricates a caching result, so that check comes before any run.
+- **The model is a column, not a setting.** Small and large from the same vendor
+  may not behave the same. Every question below gets asked of at least two
+  models per vendor wherever two are available.
+- **One address per model, except where collision is the experiment.** If the
+  small model and the large model are asked about the same address, the large
+  one may be handed the copy the small one caused, and its silence would look
+  like caching that never happened. Separate addresses everywhere; the same
+  address only in the sharing tests, where the collision is the measurement.
+- **Cache size and eviction are parked.** The stored copy is shared across
+  unrelated customers, so the pool is global and we cannot fill it. Reverses if
+  a vendor turns out not to share copies between accounts — then the pool may be
+  small enough to fill.
+
+## The questions
+
+| Number | Question, in full | Status |
+|---|---|---|
+| 1 | How long does a vendor keep a downloaded page before fetching it again? | **Done — Result 15.** OpenAI ~30 min; single untouched copy gone by 48h on all three (Anthropic ~24h, xAI 24–48h); regular use re-downloads ~once a day, does not extend a copy |
+| 2 | Does asking about the page again, before it expires, push the expiry back? | **Answered 2026-09-14 — no.** FINDINGS.md § Result 7. Single observation; repeats queued |
+| 3 | What changes to the web address make a vendor treat it as a different page? | **Done 2026-09-13** — FINDINGS.md § Result 6 |
+| 4 | What does the fetcher look like at the network level, and is it honest about who it is? | Built, runs for free alongside everything else |
+| 5 | Does one customer's download get handed to a different customer? | **Done — all three vendors share (n=1).** OpenAI Result 1c; Anthropic + xAI 2026-09-24 (direct key + OpenRouter = two unrelated customers; the second account returned the page's UNIQUE id with no fetch, held after a 10-min recheck) |
+| 6 | Does one model's download get handed to a different model at the same vendor? | **Done 2026-09-17 — FINDINGS.md § Result 13.** All three vendors SHARE across models on one account |
+| 7 | How long does a correction to the page stay invisible in answers? | Built, run once |
+| 8 | How does each fetcher react to a failed fetch (retry, back-off, amplify)? | **Done 2026-09-14** — FINDINGS.md § Result 8 |
+| 9 | Does a provider cache a FAILED fetch and serve it later (negative caching)? | **Yes for two of three (Result 10 + paired run 2026-09-22).** Anthropic holds a failure ~1 day, OpenAI ~15–30 min, xAI no (it re-fetches). Each provider's negative-cache life ≈ its content-cache life. Confirmed by the model's own `reask_answer` replaying the stale 503 with zero fetches to us. n=1 paired run — repeat queued |
+| 10 | Do the consumer WEB APPS fetch a pasted URL, and how do they differ from the API? | **Sketched 2026-09-14/15** — FINDINGS.md § Result 9. ChatGPT/Claude/Gemini/DeepSeek fetch (Grok amplifies), Copilot does not. Gemini app works where its API refuses |
+| 11 | Do the web apps show the same CACHING behaviour as the APIs (retention, negative caching)? | Open — apps confirmed to fetch (Q10); full behaviour study not done. Needs browser automation |
+
+## The grid to fill in
+
+Squares marked **done** have a result in `FINDINGS.md`. Squares marked *blocked*
+name what is missing.
+
+| Vendor and route | 1. How long the copy is kept | 2. Does re-asking reset the clock | 3. Which address changes count as a new page | 4. What the fetcher looks like | 5. Shared between customers | 6. Shared between models | 7. How long a correction stays invisible |
+|---|---|---|---|---|---|---|---|
+| OpenAI, own key, web search tool | **done** — 20 to 30 minutes on gpt-5-mini | **done** — no, the clock runs from the download | **done** — same as the OpenRouter route on all 12 changes | **done** — declares itself, address verified | **done** — copy is shared with an unrelated account | open | **done** |
+| OpenAI, through OpenRouter, web search tool | **done** — 20 to 30 minutes on gpt-5-mini | **done** — no, the clock runs from the download | **done** — least tidy; tracking tag, trailing slash, repeated and empty items each make a new page | **done** — declares itself, address verified | **done** — copy is shared | open | **done** |
+| Anthropic, through OpenRouter, web fetch tool | **done** — single untouched copy gone ~24h (Result 15); use re-downloads ~daily | open | **done** — tidiest; merges tracking tag, repeated and empty items | **done** — declares itself, reads robots.txt first | **done** — shared cross-account 2026-09-24 (direct key + OpenRouter), n=1 | open | **done** |
+| xAI, through OpenRouter, web search tool | **done** — single untouched copy gone 24–48h (Result 15); use re-downloads ~daily | open | **done** — in between; only one to ignore a trailing slash | **done** — forged browser identity, home-address pool | **done** — shared cross-account 2026-09-24 (direct key + OpenRouter), n=1 | open | **done** |
+| Perplexity, direct, fetch tool | *blocked* — no key yet | *blocked* | *blocked* | *blocked* | *blocked* | *blocked* | *blocked* |
+| Google, direct Gemini key, url context tool | *blocked* — **refuses our subdomain** (see below) | *blocked* | *blocked* | *blocked* | *blocked* | *blocked* | *blocked* |
+| DeepSeek, direct key (China variant) | *blocked on key* — web app: **short TTL <~41min** (15 Sep) | *blocked* | *blocked* | web app: fetches, forged Firefox UA | *blocked* | *blocked* | *blocked* |
+
+Question 4 costs nothing extra: every run records it.
+
+### TTL across models within a vendor — refines column 1 (added 2026-09-25)
+
+Column 1 is measured per model (gpt-5-mini shows 20–30 minutes). Open refinement:
+do two models of ONE vendor get the SAME copy lifetime? Same TTL points to one
+shared URL-keyed cache behind all the vendor's models (and corroborates the
+shared-copy finding in column 6); different TTL points to per-model caches. First
+test is OpenAI `gpt-5-mini` vs `gpt-5.5`, cheap-model-first in two stages, minute-
+level resolution. Full spec and the driver-only tool (`-ttlmap`) live in
+TODO.md § Experiments.
+
+FIRST PILOT 2026-09-25 (n=8 each, one session, no-store): `gpt-5-mini` ~33 min
+(32.0/32.9/34.0 min/median/max) and `gpt-5.5` ~33 min (33.0/33.2/33.4) —
+INDISTINGUISHABLE. Consistent with one shared cache behind both models (and with
+the cross-model sharing result: same copy, same clock), but this is TTL identity on
+n=8 in a single day — NOT proof of one physical cache, and it needs replication.
+
+HEADER-TTL SWEEP 2026-09-25 (gpt-5-mini, N=6 per arm, one session): the response
+Cache-Control makes NO difference — `no-store`, `max-age=60`, `max-age=3600` and no
+header all give ~31 min. So OpenAI ignores our Cache-Control for how long it keeps a
+copy; the ~30-min lifetime is its own policy. This also resolves the object-size
+re-fetch-after-25-min was day-to-day variance, not the route. Today's ~31 vs the
+pilot's ~33 is that same ~2-min day drift; within a day the spread is under 0.2 min.
+n=6, one session — replicate before firm claims.
+
+### A twelfth question, added 2026-09-22 — NOT one of the eleven
+
+**Does a provider find our page by CONTENT and hand it back when we never named
+the address?** Everything above (Results 1c, 12, 13) gives the provider the same
+address both times, so all it has ever shown is address-keyed reuse — the URL
+string matches and nothing is looked up. This asks the different thing: does a
+provider search its OWN stored copies by what they are ABOUT, and serve a page we
+never named? A yes is the first evidence anywhere of provider-side content-level
+reuse; a clean no tells the sibling repo `~/git/retrieval-bootstrap` the mechanism
+it studies is unbuilt, not merely unmeasured.
+
+**BUILT 2026-09-22, test-first. DEPLOYED 2026-09-24 (`/cpage/` live). NOT RUN — gated on subject-phrase uniqueness + framing, not deploy.** Driver
+`trial/contentreuse.go`, mode `-content-reuse`, own lock. Rides the `/cpage/` coded route, now DEPLOYED (origin redeployed 2026-09-24 with
+Method is a sibling of `trial/sharing.go`: warm a coded page by address (the
+provider stores a page ABOUT an invented subject), then in a fresh call name only
+the subject and ask for its record number — a code never spoken in the warm. The
+record number back with no request at our server = served from an internal store
+by content; with a request = found by content then re-fetched over the wire; no
+record number = no content reuse. The blind step runs in two tool settings (no
+tool, search offered) so the log shows which path fired instead of us guessing.
+**Anthropic is the weak row** — its only web tool needs an address to act on, so
+a blank from it proves little; marked in the run and left to resolve later.
+
+**Sharing (questions 5 and 6) is one axis — see `doc/cache-scope-framework.md`.**
+That note lays out the whole cache-*scope* ladder (within one call → within a
+session → same account → a different account) crossed with the two surfaces (API,
+web app), a status grid checked 2026-09-21, the privacy framing (URL-tag leak vs
+cookie personalisation, web cache deception), and what is left and blocked. Read
+it before designing any sharing or cross-account run.
+
+### Why Google is blocked, as of 2026-09-14
+
+Gemini's `url_context` reads `attentionhub.org` and `idea2paper.org` fine, and
+refuses `probe.attentionhub.org` — still refusing 14 hours after the subdomain
+went live. Not the model, not the endpoint, not our request shape, not our cache
+header: all four were tested and ruled out. Two explanations remain.
+
+- **The tunnel.** Google documents that tunnelling services are unsupported. The
+  parent domain is hosted normally and works; ours goes through Cloudflare Tunnel
+  and does not.
+- **Newness.** Fourteen hours old. Weakening, not dead.
+
+**Do not try to get the page indexed, and do not add a sitemap.** Google
+documents `url_context` as reading its own index first and fetching live only if
+the page is absent. An indexed page is answered from Google's copy and never
+reaches our server, so "no request arrived" would stop distinguishing reuse from
+an index snapshot — the same reason search-only providers are out of scope. The
+thing that might grant access is the thing that destroys the measurement.
+
+**The test that separates the two:** ask Jihao for one plain static file on the
+parent domain's ordinary hosting, `attentionhub.org/probe-test.html`. Reads it →
+the tunnel is the cause and Google needs ordinary hosting. Refuses it too →
+newness, and waiting is the answer.
+
+## How many runs per square
+
+One run is not a result. A model can fail to call its tool, a route can break
+for a minute, and either looks like caching.
+
+| Question | Calls needed for one run | Runs per square | Calls per square |
+|---|---|---|---|
+| 1. How long the copy is kept | 6 (one per timing) | 3 | 18 |
+| 2. Does re-asking reset the clock | 6 (4 on the watched page, 2 on the control page) | 3 | 18 |
+| 3. Which address changes count as a new page | 12 (5 variations, each warmed then re-asked, plus a control) | 3 | 36 |
+| 5. Shared between customers | 4 | 3 | 12 |
+| 6. Shared between models | 4 | 3 | 12 |
+| 7. How long a correction stays invisible | 5 | 2 | 10 |
+
+Roughly 100 calls per vendor per model. Four vendors, two models each, is under
+a thousand calls — which is affordable only on the small models.
+
+## Work items, in order
+
+- [x] **Switch every default model to the cheap one.** Done 2026-09-13.
+      Prices recorded in `PROVIDERS.md`, decision in DECISIONS.md § D9.
+- [x] **Add the model to the address tag.** Done 2026-09-13 — `Provider.Tag()`
+      carries vendor and model, and every caller of `probeURLFor` uses it.
+      DECISIONS.md § D10.
+- [x] **Run `-check` on the three new models.** Done 2026-09-13. OpenAI and xAI
+      passed. **Anthropic's cheapest model failed** — `claude-haiku-4.5` was
+      fetched by `OpenRouter-WebFetch`, not `Claude-User`, so every Anthropic
+      result would have been about OpenRouter. Moved to `claude-sonnet-5`, which
+      passed. PROVIDERS.md and DECISIONS.md § D9.
+- [x] **Separate timings for the two pages** (question 2). Done 2026-09-14 —
+      `-schedule-repeat` gives the second page its own timings, with three tests
+      and a mutation check. This is what made question 2 answerable at all.
+- [x] **Build question 3, address variations.** Done 2026-09-13. Twelve
+      variations, run with `-variations`; design and expectations below.
+- [ ] **Build question 6, sharing between models.** Copy the shape of
+      `trial/sharing.go`: same address on purpose, fixed order, a control page
+      the second model has never touched, and a different question for the second
+      model so a stored answer cannot explain its silence.
+- [ ] **Re-run questions 1, 5 and 7 on every vendor, not just the ones already
+      done.** This is the bulk of the filling-in. Note they were measured on the
+      *expensive* models; the cheap ones are now the default, so these re-runs
+      also answer whether the model changes the answer.
+- [ ] **Re-run question 3 on the real hostname.** `probe.attentionhub.org` went
+      live 2026-09-13 and its edge is confirmed clean even under an inviting
+      header (FINDINGS.md § Result 5b), so this is now unblocked — the earlier
+      result came from a throwaway tunnel.
+- [ ] **`-check` Google on the real hostname.** Gemini unparks itself off the URL,
+      so it is now a fourth vendor. Check before any run: its failure mode is the
+      silent-and-wrong one, where our log shows a fetch while the model reports
+      the page blocked.
+- [ ] **Split the unknown bucket in the report** (carried from `TODO.md`) — it
+      mixes xAI's undeclared fetches with ordinary internet scanners, and the
+      per-address tag can separate them.
+
+## Blocked on other people, unchanged from TODO.md
+
+- [ ] A stable subdomain. Unblocks Google, and any run longer than one session.
+- [ ] A Perplexity key.
+- [ ] A direct Anthropic key — would give a second way in to Anthropic, which
+      unblocks question 5 for that vendor, and is the only vendor-provided
+      switch for turning caching off, which proves the instrument can tell
+      caching from not-caching.
+
+## Question 3 as built — the twelve address changes
+
+Run with `probe-trial -variations -url <host>/vary.html -url-control <host>/limitations.html -probe-log logs/probe.jsonl`.
+Each variation warms the plain address, then asks about the changed one with a
+question nobody has asked before, and reads our server log. A download means the
+provider calls it a new page; silence means it reused its copy — but silence only
+counts once a never-before-used address downloads at the same moment, proving the
+fetcher was alive.
+
+The written standard (RFC 3986 §6) decides what each result *means*, which is why
+the table records it:
+
+| Change to the address | What the written standard says | What a download would mean |
+|---|---|---|
+| an extra item added to the query (`&x=1`) | nothing — the provider may choose | a finding either way |
+| a slash added to the end of the path | nothing — the provider may choose | a finding either way |
+| the query items in a different order | nothing — the provider may choose | a finding either way |
+| a tracking tag added (`&utm_source=email`) | nothing — the provider may choose | one article shared with five tags is five stored copies |
+| the same query name given twice (`&k=beta`) | nothing — the provider may choose | a finding either way |
+| a query item with no value (`&z=`) | nothing — the provider may choose | a finding either way |
+| the site name in capitals | the same page | a wasted download |
+| the redundant port number written out (`:443`) | the same page | a wasted download |
+| an ordinary letter written as a percent code (`a` → `%61`) | the same page | a wasted download |
+| a pointless "go here" step in the path (`/./`) | the same page | a wasted download |
+| a jump-to-a-heading marker added (`#entries`) | the same page — it never reaches a server at all | a wasted download, with nothing to argue about |
+| the file name in capitals | two different pages | correct behaviour; **silence** here is the finding — it means one address's content can be served for another's |
+
+Written-down prediction for OpenAI, made before running: **the fragment causes a
+fresh download.** OpenAI's own open browsing code keeps pages in a table keyed by
+the full address with nothing stripped, and separately skips that table whenever
+the address is handed over as text rather than as a link number. If the hosted
+product behaves differently, that difference is itself worth reporting.
+
+## Work queues — two kinds
+
+Split by what the work needs: **your attention** (a decision, a purchase, or
+building with me), versus **only elapsed time** (launch and walk away). Most
+"needs build" items are daytime; once built they become nighttime runs.
+
+### Daytime queue — needs you (decisions, procurement, building together)
+
+**Procurement — only you can do these; each unblocks a lot.** One batch to ask
+Marco/a colleague for: a direct Anthropic key + an xAI account + a direct
+Perplexity key + a direct DeepSeek key.
+- **A direct Anthropic key** → unblocks CROSS-ACCOUNT sharing for Anthropic
+  (direct key + OpenRouter = two unrelated Anthropic customers, the OpenAI /
+  Result-1c setup). NOT OBTAINED — needs the access request + budget sign-off
+  (Amandio 2026-09-16: easy to get, not in hand). Once in hand, no new code:
+  `-sharing-test -sharing-first anthropic -sharing-second or:anthropic`.
+- **A second account at xAI** → the same cross-account test for xAI. No xAI
+  account exists (Amandio); needs Marco.
+- **A direct Perplexity key (Agent API)** → a whole 5th vendor. OpenRouter CANNOT
+  reach it: the Sonar endpoint it exposes rejects the fetch tool (404 "no
+  endpoints support tool use") and only searches its own index. The DIRECT Agent
+  API has a `fetch_url` tool that fetches a named URL (PerplexityBot hits us).
+  Code path written, untested (DECISIONS D5).
+- **A direct DeepSeek key** → a real 2nd short-TTL vendor (web app: live-fetch,
+  <~41 min, Result 9). OpenRouter is a dead end (its web_fetch is OpenRouter's own
+  fetcher). Signup errored for our account → colleague route.
+- **Jihao: one plain static file on `attentionhub.org`** → settles whether Google
+  is blocked by the tunnel or by the subdomain's newness.
+
+**Build with me (each becomes a nighttime run once done):**
+- **Object-size sweep** → does a page's size change how it's cached (refuse/evict
+  large pages sooner)? **BUILT 2026-09-22; DEPLOYED + first pass RAN 2026-09-24 (3-min gap = FLAT, no admission cutoff; eviction/GDSF longer-gap pass RUNNING).**
+  Design first in doc/object-size-sweep-design.md (ladder + the read that tells a
+  → 512 KiB cache rungs n=3 to 256 KiB / n=1 at 512 KiB, plus a 1–4 MiB
+  fetch/token-limit probe, warm+reask a short gap apart, emits the standard
+  REFUSES to start without `--providers` (money guard); per-caller analyzer
+  model, kept-rate vs size, n/a when unjudgeable, cache vs probe kept apart).
+  First pass RAN 2026-09-24 (OpenAI); origin now free (retention done); eviction pass RUNNING.
+  OPEN DECISION (resolve later): whether to auto-call the per-vendor analyzer from
+  summary during the run, but the final report does not, so read it with
+- **robots.txt respect poke-then-ask fix** → the clean Anthropic verdict: after
+  arming the block, poke Claude into a fetch until it re-reads robots (TTL now
+  known — ~1h, Result 14), then ask. Result 11 left it inconclusive because
+  idle-waiting never triggers a re-read. Unblocked; ready to build.
+- **robots.txt invalidation** → FIRST PASS DONE 2026-09-20 (`-robots-invalidate`,
+  `logs/robots-invalidate.jsonl`): Anthropic **KEEPS** an already-cached copy after
+  a disallow — no re-fetch, still answered with the content. BUT this is only
+  SUGGESTIVE, not proven: the page content never changed and the marker is the
+  same on every page, so "still answered" could be confabulation, and at re-ask
+  the copy was only ~25 min old (well inside the ~1-day cache), so "no re-fetch"
+  is expected with or without the block.
+  **CLEAN RE-RUN, queued for a night (origin now free after retention; the keyed
+  /cpage/ page is deployed and ready):**
+    - Give each generated page a UNIQUE code (an HMAC of the id), so the code in
+      the re-ask answer proves it held THAT page — kills the confabulation hole.
+      OR change the page's content after caching (v1→v2) and see which version
+      comes back. Either needs proxy/pages.go + updating the golden test.
+    - Run it long enough to also see the natural-expiry-under-block case: while
+      blocked Claude cannot re-fetch, so when the ~1-day copy expires it should
+      end up with nothing. First pass only watched ~25 min.
+  Full design in TODO.md.
+- **Negcache follow-up (a): Anthropic ceiling with a paired healthy page** → run a
+  healthy page alongside the broken one so "remembered the failure" separates from
+  "hasn't re-fetched anything yet" (its cache is ~1 day, Result 15). Small build; then a night
+  run. (Caveat is on Result 10.) **DONE 2026-09-22 (`-negcache-paired`, `logs/negcache-paired.jsonl`), n=1 first
+  pass. RESULT: for Claude and OpenAI the once-broken page is re-fetched no LATER
+  than the paired healthy page — the failure is not held longer than normal content
+  (both expire and re-fetch together at 24h). This is NOT "no negative caching":
+  Claude DOES negative-cache. The Result 10 runs (`logs/negcache-v2.jsonl`, field
+  `reask_answer`) show Claude serving the remembered failure with zero fetches to us,
+  saying verbatim "I attempted to fetch ... the tool returned an error" — which also
+  proves the tool fired, killing the "search never ran" doubt. So Anthropic
+  negative-caches a failed fetch with a ~1-day (12-24h) TTL, matching its content
+  TTL, and it looks reliable so far. Caveats: n=1 (repeat queued); the paired run
+  DROPPED `reask_answer` (add it back so each verdict carries the model's own words);
+  space/capacity eviction still untested. Grok: one 24h blip against a noisy
+  amplifying baseline — treat as noise.**
+- **Web-app behaviour study** → extend the full question set to the consumer apps
+  (Result 9), not just "does it fetch". Method decided: a person drives the
+  browser, the `-webtrial` console does the rest (NOT a robot). Recipes + results
+  in `doc/web-app-recipes.md`; design in `doc/web-app-automation-plan.md`.
+  - [DONE 2026-09-20] Console + dataset pipeline (`-webtrial`): editor capture,
+    per-run raw files, regenerable dataset.jsonl/.csv, `run_id`, query with DuckDB.
+    Commits 56c27d0, 0eca1b8.
+  - [DONE 2026-09-20] "Does it fetch" first pass, 10 apps, ONE trial each. Fetch:
+    ChatGPT, Claude, Gemini (web app fetches though its API refuses), Meta,
+    Mistral, Qwen, Grok (10x burst), DeepSeek. Index-only: Copilot. Inconclusive:
+    Perplexity.
+  - [DONE 2026-09-21] Bigger sample for the fetch test: **3+ trials per app** — met,
+    `logs/web-trials/dataset.jsonl` now has 4–7 trials each. Rates: ChatGPT/Gemini/
+    Grok/Meta/Qwen fetch every time (4/4); Claude 6/6 got the content; DeepSeek the
+    flaky one now pinned at 5/7; Mistral 2/4; Copilot never (0/4, index-only);
+    Perplexity 4/4 "served-from-store" (unverified — needs the keyed code). No build
+    was needed; the earlier "ONE trial each" note was stale.
+  - [DONE 2026-09-20, build a0d6fa4 — runs still to do] **Caching / holds-a-copy**:
+    `-webtrial-reask <trial_id>` re-asks the SAME page in a fresh chat; each ask
+    owns the fetches in its own time window, so a re-ask counts only new ones.
+    Verdict: fetched = re-fetched (didn't keep), served-from-store = kept a copy.
+    Still TODO: actually run the spot-checks (warm, then re-ask after 30m/2h/1d),
+    API result as the reference — not a full sweep.
+  - [DONE — mechanic, via re-ask; runs to do] **Cache scope**: is a held copy
+    per-chat, per-account, or global across users? Same `-webtrial-reask`, varying
+    WHERE you ask again: (a) same chat, (b) new chat / same login, (c) a different
+    account or logged out (record the scope in config). Hypothesis: global cache —
+    needs verifying. (c) needs a second account or a logged-out session.
+  - [TODO — build with me, NO server change] **Error-code / server-reaction**: point
+    the console at the `/fault/` paths (404/500/503+retry/slow/empty/reset/flaky-N)
+    and record how each app reacts. Needs time-window correlation, since fault
+    paths are fixed (the unique-URL trick doesn't attribute them).
+  - [TODO — build with me] **Negative caching** (does it hold a "broken/missing"
+    answer): the re-ask mechanic pointed at a fault page. After the two above.
+  - [TODO — build with me] **Address variation**: mint odd spellings (trailing
+    slash, case, dot-segments) and see if the app still fetches.
+  - **Per-page keyed code** — makes "served-from-store" solid and would settle
+    Perplexity's (and Claude's cross-session) inconclusive verdict.
+    **ROUTE BUILT 2026-09-21 (commit a2ddbfb), NOT deployed.** `/cpage/<id>` serves
+    a subject + two unforgeable codes; `internal/probe/cpage.go` is the shared truth;
+    `/page/` left byte-identical (retention-safe); tests written first, all green;
+    verified on a spare port. Three steps remain, gated on the origin freeing (the
+    paired negcache run's last rung, ~04:51 Tue KSA — later than retention):
+      1. [DEPLOY — needs origin restart] launch the origin with
+      2. [content-reuse session] vet the 12 `cpageSubjects` phrases for open-web
+         uniqueness before any paid call (needs-doc #2); they ship as candidates.
+      3. [DONE 2026-09-22, commit f124d46] web console `-webtrial-coded` mints
+         `/cpage/cr0-<app>-<nonce>` URLs and checks answers against the recomputed
+         code (solid fetch-proof). Usable once the route is deployed.
+    Design agreed 2026-09-20:
+      - Code = HMAC(server-secret, page-id). A PLAIN hash of the id is useless (the
+        id is in the URL, so the app could compute it without fetching); the secret
+        makes the code unforgeable, so quoting it proves a real fetch. Secret is
+        long-lived and server-side; codes are recomputed to verify, never stored.
+      - MUTATION RULE (covers the staleness test too): key on (id, version) —
+        `HMAC(secret, id:version)`. v1 code in an answer = stale cached copy; v2
+        code = it re-fetched after the change; neither = never had it. Bump version
+        = new content = new code; the ETag changes with the bytes automatically.
+      - Deploy SAFELY via a NEW route (e.g. /cpage/<id>) that renders id+code, and
+        point the web console at it, leaving /page/ bytes untouched so the retention
+        run's fingerprints don't move. Only cost is a brief origin restart, done
+        between retention ticks.
+      - Do NOT use it where you want collisions: sharing / shared-cache tests need
+        identical pages, so they keep a plain shared page. Never retrofit onto a
+        page a live run already depends on. Keep the secret fixed (rotating it
+        changes every code and every fingerprint at once).
+  - [BLOCKED same window] **Robots respect on web apps**: page behind a disallow,
+    does the app fetch anyway. Needs a robots.txt setup on the origin.
+  - [TODO — small] **Kimi** on a VPN (KAUST↔Asia latency makes it unusable on
+    KAUST WiFi; not a throttling finding).
+  - [TODO — analysis] Check the raw log for why ChatGPT/Claude/Mistral/Qwen fetched
+    under generic browser user-agents this pass, vs the declared `ChatGPT-User`/
+    `Claude-User` names seen in Result 9's hand-check.
+  - [DONE 2026-09-20, build 87eba80] Ask-first handling + confirmed variant. The
+    console asks "did the app ask a question? (y/N)"; a yes in the default protocol
+    is its own verdict `asked-permission`. `-webtrial-confirm` gives one fixed line
+    ("Yes, please go ahead.", uniform across apps) and captures the second reply —
+    the "browses when permitted" condition, kept separate from the default numbers.
+  - [TODO — later, if needed] Broaden the ask-first stage. It is currently scoped to
+    the one case seen (asking permission to access). If apps start asking OTHER
+    clarifying questions ("which page?", "do you mean X?"), those differ from a
+    permission gate and may want their own categories rather than one blanket
+    "asked a question". Ad-hoc for now on purpose; extend when a second case shows up.
+
+**Polish / analysis (short, with me):**
+- Adopt the plainer miss-vocabulary across `FINDINGS.md`.
+- Split the `unknown` bucket in the report.
+
+### Open questions (deep — some may not be answerable)
+- **How big is the cache (capacity)?** The deep prize; may be unobservable, since
+  we will not overload a shared cache. Prior art: Cache Inference Problem
+  (Laoutaris, INFOCOM 2007); CacheQuery (Vila, PLDI 2020).
+- **Does it evict faster at busy hours?** Run the same retention test at a quiet
+  vs a peak hour — the feasible backdoor to capacity (observe natural load, never
+  create it).
+- **Is the expiry a hard cliff or a fuzzy edge?** Many one-shot pages checked once
+  each across ages; an early tail would itself point to eviction.
+- **The Gemini oddity** → it downloaded our page in full (and pages we never
+  named), then reported it could not access it. Not reproducible on demand.
+
+**Recently done (out of the queues):** object-size sweep BUILT (2026-09-22,
+doc/object-size-sweep-design.md; also fixed a pre-existing flaky test
+(`newEditionFrom` injects the entropy source so the edition mapping is checked
+deterministically). Standard result-record interface
+(2026-09-22) — one shared `probe.ResultRecord` (one row per ask, facts only,
+verdict/fetch-count derived later), a shared `emitResults` writer, and ALL nine
+API runners ported to it, dual-writing to `logs/results/<experiment>-<run_id>.jsonl`
+beside their old bespoke files (full detail + what's left in TODO.md § Instrument);
+fresh-URL fix for the fault runner;
+negative-caching runner (Result 10); robots.txt respect server+driver (Result 11);
+staleness fine-run → OpenAI correction latency pinned ~30 min (Result 4 update);
+per-user isolation test → Anthropic & xAI share across users on one account
+(Result 12); cross-MODEL sharing → all three vendors share a copy across models
+(Result 13, completes the account/user/model hierarchy); robots.txt TTL runner
+built (`-robots-ttl`); robots.txt cache lifetime measured ~1h (Result 14, two
+runs); multi-day retention ceiling settled — single untouched copy gone within
+1–2 days, use re-downloads ~daily (Result 15); per-trial results table built and
+wired into the driver + analyzer.
+
+### Nighttime queue — needs only elapsed time (launch and sleep)
+
+1. **Multi-day single-use retention probe** — **COMPLETE 2026-09-22 22:26 KSA**
+   (launched 2026-09-15, full 7 days, all 351 checks done; cron removed 2026-09-24,
+   origin no longer frozen). **Result 15:** a single untouched copy is gone by 48h
+   on all three (Anthropic ~24h, xAI 24–48h, OpenAI ~30 min); regular use
+   re-downloads about once a day and does NOT extend a copy. The final 7-day (168h)
+   checks confirmed the copy stays gone — nothing resurrects. Read anytime:
+   `probe-trial -retention-report -retention-state logs/retention-multiday.state.json`.
+2. **robots.txt cache-lifetime (TTL) run** — **DONE (Result 14).** Two runs
+   (5h + 2.5h) put the lifetime at ~1 hour (gaps 60–70 min). Unblocks the
+   poke-then-ask fix and the invalidation test.
+3. **Negcache follow-ups** — (a) Anthropic ceiling with a paired healthy page
+   (needs the small build above); (b) OpenAI 15–30 min boundary — `-negcache`
+   with gaps 18/21/24/27 min to pin where it flips.
+4. **Firm-ups (built, launch when convenient):** repeat the OpenAI clock test
+   (`run-clock-test.sh`, ~$1.20); re-run address variations on the real host
+   (~2.5h); fault-battery repeat (unblocked by the fresh-URL fix).
+
+## Ideas held in reserve, not needed yet
+
+- **Unique page content per visit.** Serve a different invented code to each
+  visitor or each time period, then see which code comes back in an answer. That
+  pins an answer to one exact download. Only needed if page-and-time matching
+  stops being enough to tell two downloads apart — for example if we start
+  testing many callers at once. The staleness test already does a small version
+  of this.
+
+# Open measurements — what is not yet done, and what to observe
+
+For handing to a literature/context session. Each row is an experiment we have
+not finished, what we would watch for, its status, and leads for related work.
+
+## Framing for a search agent — read this first
+
+- **Vantage point is black-box, from the origin only.** We see fetches arriving
+  at our own server; we never see the provider's internals. The useful prior work
+  is *remote / black-box cache inference*, not white-box cache design.
+- **The cached object is a retrieved web page inside an LLM tool**, not a CPU
+  cache line or a plain CDN edge object. CPU-cache and pure-CDN work is a
+  *methodological ancestor only*; the closest real analogue is the AI-crawler
+  cache literature (Cloudflare/ETH and Meta papers in
+  `doc/caching-policy-refs.md`).
+- **We cannot fill or control the cache.** It is shared and global (measured:
+  OpenAI hands one copy to unrelated customers). So methods that need to fill or
+  isolate a cache do not transfer; we are limited to dropping our own bait pages
+  and reading our own log.
+
+## The table
+
+| Experiment | What we would observe | Status | Related work / concepts to look up |
+|---|---|---|---|
+| **Object size effect** | Do larger pages get evicted or refused sooner than small ones? Serve canaries of varied size, all else equal. | Not started (fresh idea) | Size- and cost-aware eviction: GreedyDual-Size (GDSF); CDN admission by object size; S3FIFO / SIEVE; Meta CacheFlare cold-object handling; "large object bypass" in CDN docs |
+| **Timeout survival curve (fine)** | The exact timeout, its shape (hard cliff vs fuzzy), and any early tail. Many single-use canaries checked once each across ages. | Partial — 2 points only (Result 7) | TTL caches; Che's approximation / "characteristic time"; survival / hazard-rate analysis of eviction |
+| **Time-of-day / load contrast** | Do early evictions appear and grow at busy hours? Same survival run, quiet vs peak. | Not started | Cache behaviour under working-set pressure; miss-ratio vs load; diurnal CDN traffic studies |
+| **Space eviction / effective size** | Any eviction *before* the timeout on an untouched page. | Not started; may be unobservable (cannot create pressure) | Cache Inference Problem (Laoutaris et al., INFOCOM 2007); eviction-set / prime-probe methods; CacheQuery (Vila et al., PLDI 2020) |
+| **Access-frequency fingerprint** | Does asking more often protect a page, and is it recency- or frequency-shaped? | Done for OpenAI (2-level, no effect in 30 min); undone elsewhere / under pressure | LRU vs LFU vs FIFO vs SIEVE vs S3FIFO protection semantics; scan resistance |
+| **Cross-model sharing (Q6)** | Does model A's fetch serve model B at the same vendor? Same address, two models, ordered. | Not started | Multi-tenant cache isolation levels; Auditing Prompt Caching (Gu et al., ICML 2025) — per-user/org/global framing |
+| **Cross-customer sharing (Q5) — Anthropic, xAI** | Does one account's fetch serve another account? | Blocked — needs a 2nd account each | As above; shared-cache side channels |
+| **Retention (Q1) — Anthropic, xAI** | The actual timeout (only a ">2h" floor now). | Partial — floor only | TTL measurement; as survival curve |
+| **Clock: from-download vs last-use — Anthropic, xAI** | Does re-asking reset the timer? | Not started (done for OpenAI: from download) | TTL-from-insertion vs recency-LRU |
+| **robots.txt disallow invalidation** | Does disallowing a page *after* it is cached drop the copy? Anthropic only reads robots.txt. | Not started (in TODO) | RFC 9309; crawler cache-invalidation behaviour |
+| **Negative caching (cached failures)** ⭐ | Does a provider remember a *failed* fetch and serve it without re-fetching? Warm a fresh fault URL (it errors), re-ask the same URL shortly after; no second fetch = the failure was cached. | **Strong hint** — Anthropic went silent on repeat error URLs (fault run 2); OpenAI/xAI re-fetched. Needs the clean single-run test. | Negative caching (DNS non-existence, RFC 2308); HTTP caching of error responses (RFC 9111 §4.2.x); stale-if-error (RFC 5861) |
+| **Retry-after-success (the Gemini oddity)** | A fetcher that downloads a 200, reports failure, and refetches. | Observed on Gemini, not reproducible on demand | HTTP retry semantics (RFC 9110); reflection / amplification; SSRF-style fetch abuse |
+| **Fault-retry repeat (rates)** | Turn Result 8's single counts into rates; check load dependence. | Queued (overnight) | Fault injection: Toxiproxy, chaos testing (see doc/fault-injection.md) |
+
+### Web-app surface (manual, 2026-09-14) — sketched, worth automating
+
+The consumer chat apps are a separate measurable surface from the APIs, tested by
+hand (paste a tokenised URL, read our log). Result: ChatGPT/Claude/Gemini fetch
+once and declare themselves; Grok fetches ~10x from disguised IPs; Copilot does
+not fetch. Crucially, the **Gemini web app reads our subdomain that its API
+`url_context` refuses** — so the API block is tool-specific, not our site. See
+FINDINGS.md § Result 9. Open work: automate (browser driving), repeat for rates,
+and add a bot-table signature for the bare `Google` web-app fetcher.
+
+### Providers tested and ruled out
+
+- **Microsoft Copilot — out (tested 2026-09-14, manual web UI).** Pasted a
+  tokenised probe URL into copilot.microsoft.com and asked it to read the page.
+  **Nothing reached our server** (only our own curl liveness check appeared). It
+  replied that it could not retrieve the page and that no source indexes it, then
+  *confabulated* an example code (`STUDY-REF-1234`, nothing like our real
+  live-fetch a named URL; it is index-only (Bing catalogue), and making it find
+  our page would require indexing, which reintroduces the index-snapshot confound
+  that voids the measurement. No API route pursued (developer access is heavy
+  Azure provisioning). Documented negative.
+
+## What is already answered (so the search agent does not re-derive it)
+
+- Address normalisation — which URL changes make a new page (Result 6).
+- Fetcher identity and honesty (Result 4); xAI forges browser UAs from an IP pool.
+- Retention ~30 min for OpenAI; clock runs from download, not last use (Result 7).
+- Cross-customer sharing for OpenAI: copies ARE shared (Result 5).
+- Cache directives ignored; caches the page not the answer (Results 2, 3).
+- The CDN edge caches nothing on our path, even when invited (Result 5b).
+- Failure-retry behaviour, one run: three personalities, xAI amplifies (Result 8).
+- Google is not measurable — refuses our subdomain; cause narrowed to tunnel vs
+  newness, not yet split (see § Google in FINDINGS.md).
+
+Full detail for all of the above: `FINDINGS.md`.
+
+---
+
+## Elaborations from a literature session — 2026-09-14
+
+Notes returned by a context/search session, then **verified against the primary
+sources on 2026-09-14** (read directly). Facts confirmed against the source are
+marked **[checked]**; one framing error is marked **[corrected]**.
+
+### Object size — three distinct policies, each with its own signature
+
+Do not just ask "does bigger get evicted sooner." Design the size sweep to tell
+these three apart, because they look different:
+
+- **GDSF (Greedy-Dual-Size-Frequency)** — Cherkasova, HPL-98-69, read directly
+  **[checked]**: priority is `Pr(f) = Clock + Fr(f) * Cost(f) / Size(f)`, so
+  dividing by size means a bigger object gets lower priority and is evicted
+  *before* a small one at equal frequency. `Clock` is an aging term that rises
+  over time. Signature for us: a gradual, frequency-weighted size disadvantage.
+- **Hard size-threshold admission** — refuses to cache anything above a fixed
+  size at all (e.g. nothing over 512 KB). Signature: a sharp cliff at one size,
+  nothing gradual.
+- **Probabilistic size admission** — caches with a probability that shrinks as
+  size grows. Signature: a smooth probability curve, not a cliff.
+
+So the readable outcomes are: a hard cliff, a probability curve, a gradual
+frequency-weighted disadvantage, or no size effect at all (size-blind).
+
+### Timeout survival curve — a fuzzy edge may be by design
+
+- **TTL jitter is deliberate.** Adding small random spread to timeouts stops many
+  copies expiring at once and causing a pile-up of simultaneous re-fetches (a
+  "cache stampede" / "thundering herd"). So a fuzzy-edged timeout is not
+  necessarily "we don't understand it" — it may be jitter, and **the spread of
+  the curve, not just its centre, is worth reporting.**
+  **[corrected]** The search note attributed the stampede motivation to RFC 5861;
+  read directly, it does not say that. RFC 5861 defines two things —
+  `stale-while-revalidate` (serve a stale copy for up to N seconds while
+  refreshing in the background) and `stale-if-error` (serve a stale copy when the
+  origin returns a 5xx). Its stated motivation is hiding latency and staying
+  available, not stampede avoidance, and TTL jitter is a separate practice not in
+  the RFC. Keep the two apart in a write-up.
+- **A fixed timeout and a size-limited cache are formally linked. [checked]** Che,
+  Tung and Wang (2002) introduced the "characteristic time" t_C of an LRU cache;
+  Fricker, Robert and Roberts (arXiv:1202.3974) verified it rigorously. Read
+  directly: for a cache holding C objects, t_C is defined by `m(t_C) = C` — the
+  expected number of distinct objects requested within a window of length t_C
+  equals the capacity — and an object is a hit if re-requested within t_C of its
+  last request. That is exactly a per-object TTL of t_C. Practical payoff: a
+  measured timeout can be read as an *implied cache size* via `m(t_C) = C` — a
+  more concrete claim than a bare "timeout ≈ 35 minutes" — but only if the
+  timeout is capacity-driven, not a deliberately configured clock.
+
+### Time-of-day — track origin-hit volume, not only hit ratio
+
+"Characterizing Caching Workload of a Large Commercial CDN" (INFOCOM 2016) shows
+real CDN traffic has clear daily patterns (peak daytime-to-evening, quiet after
+midnight) and argues hit ratio is not the only metric — they also track how much
+traffic reaches the origin overall, separately. For us: alongside "did the
+timeout shorten at peak," track **raw origin-hit volume over the day** as an
+independent signal.
+
+### Retention — external anchor for whether our numbers look normal
+
+Twitter's production cache study (Yang, Yue, Vinayak, OSDI 2020), read directly
+**[checked]**: "TTL ranges from minutes to days. More than 25% of the workloads
+use a mean TTL shorter than twenty minutes, and less than 25% ... longer than two
+days"; write-heavy workloads skew short (about half under ~10 minutes). It also
+states TTL "limits the effective (unexpired) working set size." So our ~30-35 min
+OpenAI figure sits squarely in the common range and the ">2 h" floor is
+unremarkable. Two more of its findings help us: under reasonable sizes **FIFO
+often performs like LRU** (so we should not assume LRU), and most cached objects
+are small (tens of bytes to tens of KB) — relevant to the object-size sweep.
+
+### Adopt a standard vocabulary for *why* a miss happened
+
+Rather than one "cache miss" bucket, label each miss by cause. This forces
+precision and maps directly onto our findings and open questions:
+
+| Miss type | Meaning | Where it appears for us |
+|---|---|---|
+| **cold** | first-ever request for this object | the FirstSight bucket; every warm |
+| **capacity** | evicted to make room | the open space-eviction question |
+| **conflict** | routing/sharding collision | not yet observed |
+| **expiration** | timeout elapsed | Result 7 (the ~30 min timeout) |
+| **invalidation** | explicitly purged | the robots.txt-disallow question |
+| **key-mismatch** | a URL variant treated as a different object | Result 6 (address normalisation) |
+
+### robots.txt invalidation — confirmed genuinely open
+
+The search session found no dedicated academic work on "does disallowing a page
+after it is cached evict the copy." It is a narrow, LLM-crawler-specific
+question, so that row is a real, non-redundant experiment rather than something
+already answered.
+
+### ⭐ Negative caching — the behaviour difference worth chasing
+
+The most surprising thread so far, from the fault-battery repeat (2026-09-14).
+
+**The hint.** Run 2 asked about the *same* fault URLs as run 1. Anthropic did
+**not** re-fetch the instant-error faults (404/500/503/empty/reset) but **did**
+re-fetch the slow one; OpenAI and xAI re-fetched everything. Simplest
+explanation: Anthropic caches the fetch *outcome including the error*, and reused
+it; the others do not cache errors (they retry). The slow fault has no clean
+outcome to cache, so even Anthropic re-fetched it — which fits.
+
+**Not yet proven.** The URLs were reused across runs, so "Anthropic didn't
+re-fetch" could still be ordinary page-caching lingering from run 1 rather than
+caching the *failure* specifically. The clean test settles it.
+
+**The clean test (fresh URL, single run):**
+1. Point the provider at a brand-new fault URL it has never seen → our log shows
+   the fetch, it gets the error.
+2. Re-ask the same URL after a short gap.
+3. No second fetch, on a URL nothing could have cached earlier, = negative
+   caching, proven.
+4. Vary the gap to measure *how long* a failure is remembered.
+
+**Why it matters.** A momentary error — a deploy blip, a brief block, a
+transient 5xx — could be remembered and served as "this page is broken" after the
+site has recovered. A transient problem becomes a lasting wrong answer, through
+no ongoing fault of the owner. That is a sharper harm than correction-invisibility
+and it lands on the site owner unfairly.
+
+**Term and prior art.** "Negative caching" is the established name — DNS caches
+non-existence (RFC 2308); HTTP permits caching some error responses (RFC 9111);
+`stale-if-error` (RFC 5861) is the deliberate serve-stale-on-error mechanism.
+The novel part is observing it in an LLM's fetch layer, timing how long it lasts,
+and the provider-to-provider difference (Anthropic appears to; OpenAI/xAI do not).
+
+# Caching-policy references — cold-object and AI-aware eviction
+
+Recorded 2026-09-14, for the discussion on whether the death-age /
+access-protection model can characterise a provider's retrieval cache, and how
+much to scale it. These are prior art on modern eviction/admission policies —
+the "other schemes" beyond simple timeout or recency-LRU.
+
+Why they matter to our method: our probe canary is a **unique URL, asked once,
+never reused** — which is precisely the traffic profile these papers say breaks
+ordinary caching and which cold-aware policies are designed to detect and evict
+early. So under such a policy a once-asked canary may be dropped fast *regardless
+of how full the cache is*, which would make a naive "early death = space is
+biting" reading misfire. The access-frequency lever (ask a canary 1x, 2x, 5x,
+10x and watch survival) is what disambiguates, and it turns the experiment from
+"measure cache size" into "characterise the admission/promotion policy".
+
+## The two papers
+
+- **Cloudflare + ETH Zürich — "Rethinking Web Cache Design for the AI Era",
+  SoCC 2025 (ACM Symposium on Cloud Computing).** Premise: AI crawlers hit a high
+  ratio of unique URLs, once each, without reuse or browser/session caching, so
+  they degrade a cache tuned for humans. Examines cold-aware eviction — names
+  **SIEVE** and **S3FIFO** — and AI-aware / learning-based admission as fixes.
+  Directly about our exact traffic class (AI-crawler-shaped requests).
+  Blog summary: https://blog.cloudflare.com/rethinking-cache-ai-humans
+  Coverage: https://ppc.land/cloudflare-and-eth-zurich-say-ai-bots-are-breaking-the-webs-cache-layer/
+  (find the formal SoCC 2025 paper for the citation; retrieved 2026-09-14.)
+
+- **Meta — "CacheFlare: Optimizing Cold Content Performance in CDNs",
+  SIGCOMM 2026 (ACM).** Admission/handling for cold content in a CDN.
+  https://dx.doi.org/10.1145/3603269.3604863 (retrieved 2026-09-14.)
+
+## The named policies, in one line each (for glossing in a write-up)
+
+- **SIEVE** — a first-in-first-out queue with a "keep" bit; a scanning hand
+  evicts objects whose bit is unset, so one re-request buys a second chance.
+- **S3FIFO** — small + main + ghost queues; one-hit objects are evicted quickly
+  from the small queue, and only a re-request promotes an object to the main
+  cache. Explicitly targets one-hit-wonders.
+- Both give *access protection*, which is the axis our access-frequency sweep
+  measures; a once-asked canary is the worst case for both.
+
+## Relation to prior art already in the handover
+
+Complements `doc/nextstep.md`'s list: CacheQuery (Vila et al., PLDI 2020) learns
+a replacement policy from a *fillable, isolated* cache with crafted sequences —
+which we cannot do here (shared, unfillable). We borrow only the idea of designed
+access sequences, via the access-frequency lever, and reach coarse policy buckets
+rather than full identification. The Cache Inference Problem (Laoutaris et al.,
+INFOCOM 2007) remains the reference for inferring a cache from what falls out of
+it.
+
+# Cache-scope framework — how far does one downloaded copy travel?
+
+Written 2026-09-21. The single place the plan, the paper, and any new session
+should read for the cache-*scope* question: not "how long is a copy kept" (that is
+retention, Result 15) but "who else gets served the copy one caller caused." Every
+claim here was checked against FINDINGS.md and the code on 2026-09-21.
+
+## The shape: one nested ladder, crossed with two surfaces
+
+The scope question is a **single ordered ladder**, not three independent axes. Each
+rung contains the ones above it — a copy shared at a wider rung is automatically
+shared at every narrower one:
+
+```
+within one call  ⊂  within one session  ⊂  same account  ⊂  a different account
+```
+
+The genuinely separate axis is the **surface**, because the two surfaces expose
+different rungs:
+
+- **API** — we craft the whole context every call. The identity that could
+  partition a cache is the key/account (and, within an account, the model or user).
+- **Web app** — there is a chat session, so a copy can be reused inside a session,
+  across sessions on one login, or across logins.
+
+The privacy stakes rise as you go down the ladder: within-session reuse is
+expected and harmless; a copy crossing accounts is the alarming one.
+
+## The status grid (checked 2026-09-21)
+
+Legend: ✅ done · 🟡 mechanic built, runs to do · 🔎 possible but untested ·
+⛔ blocked (on what) · ⏭️ skip as a built experiment
+
+| Rung (how far a copy travels) | API side | Web-app side |
+|---|---|---|
+| **1. Within one call** (sub-agent / retry overlap) | ⏭️ only retry *amplification* seen (Grok hit us up to 7× on one question, Result 8) — not proven sub-agent reuse. Report it, don't build. | ⏭️ deep-research modes spin sub-agents; duplicate-fetch count is observable but not controllable. Name it, don't build. |
+| **2. Within one session** (carry state between calls/asks) | 🔎 untested, and **possible on OpenAI**: we drive every call independently so no session carries, but OpenAI's Responses API (`/v1/responses`, `store` + `previous_response_id`, see `trial/providers.go:177`) *can* hold server-side session. Anthropic (`/v1/messages`) and OpenRouter (`/chat/completions`) are stateless. | 🟡 re-ask in the **same chat** — mechanic built (`-webtrial-followups` `same-session`), runs to do. Small. |
+| **3. Across calls/chats, same account** | ✅ same key across time (retention, Result 15); same account, different **model** (Result 13 — all three SHARED); same account, different **user** (Result 12 — Anthropic + xAI SHARED). | 🟡 re-ask in a **new chat, same login** — mechanic built (`-webtrial-reask`, `-webtrial-followups` `new-session`), runs to do. Small. |
+| **4. Across different accounts** ← the prize | OpenAI ✅ (Result 1c — our key vs OpenRouter's, genuinely two customers). Anthropic ⛔ needs a 2nd Anthropic key. xAI ⛔ needs any 2nd xAI account. | ⛔ not started — needs **two logins / profiles** per app, plus the **keyed page** to trust "served-from-store." |
+
+**The OpenRouter user-id caveat (rungs 3–4).** The Result 12 cross-user test is
+*not* a cross-account result. OpenRouter forwards the `user` id only "when a
+provider requires a user identity," and we cannot confirm the native Anthropic/xAI
+routes use it at all. So a "shared" reading there cannot tell apart three cases:
+the cache is account-wide/global, the id was received and ignored, or it was never
+forwarded. It shows only that *no per-user isolation happened*. The single clean
+way to answer cross-account is a **real second account** at each vendor — the
+`user` field is not a substitute.
+
+## The privacy angle — two mechanisms, only one of which bites here
+
+"A page whose content depends on who asked, cached and served to someone else" is
+the privacy harm. There are two ways content can depend on the asker, and they
+behave very differently through an LLM fetcher:
+
+1. **State on a cookie / login, same URL for everyone** (the classic personalized
+   page). This is **largely closed** for LLM fetchers: the provider's crawler
+   fetches as an anonymous bot and does not carry the end-user's cookie to the
+   target site, so the site cannot render a per-user page in the first place.
+   Worth stating as a finding in its own right.
+2. **State on the URL — a tag or token** (`?uid=alice`, a signed/share link). This
+   is the **realistic** vector, and whether it leaks is a cache-key question: does
+   the provider treat `?uid=alice` and `?uid=bob` as two pages (each its own copy,
+   no leak) or one (a shared copy — leak)? We already have half of this: Result 6
+   (address variation) measured exactly which URL parts each provider merges vs
+   splits. Merging + cross-account sharing = a page personalized on that part
+   leaks across accounts.
+
+### Real credentials do not belong in the URL — so do not anchor on them
+
+Putting a real credential in a query string is bad practice and, for access
+tokens, now forbidden: OWASP says never put API keys or session tokens in the URL
+(HTTPS does not help — the full URL lands in browser history, server/proxy/CDN
+logs, and the `Referer` header), and RFC 9700 (2023) hardened RFC 6750's *SHOULD
+NOT* to access tokens *MUST NOT* be sent in the URI query. So a leak that depends
+on a victim putting a credential in `?XXX` is weak — partly their fault.
+
+Anchor the experiment on the stronger, blameless framing instead: **non-secret
+per-request state in the URL** (the query text itself, a personalization tag, an
+A/B bucket) is legitimate and everywhere. Serving one asker's rendered page to
+another is a real bug with no credential misuse involved. The sanctioned exception
+— signed/expiring links (S3 presigned, magic links) that deliberately carry a
+secret in the query as a short-lived capability — points at the sharpest test of
+all (below).
+
+### Two experiments this framework points to
+
+- **Tag-keyed leak (composes three instruments we have/queued).** Make the page
+  body depend on a query tag — `?uid=alice` renders alice's unique code, `?uid=bob`
+  renders bob's (the code being the HMAC stamp, so it is unforgeable). Warm as
+  alice, then ask with `?uid=bob`. If the answer quotes *alice's* code with no
+  fresh fetch, the provider merged the tag and served one asker's content for
+  another. Uses the keyed body + the address-variation harness (`trial/variations.go`)
+  + the sharing harness (`trial/sharing.go`). Make the tag **guessable**
+  (`?uid=1,2,3`) so the second asker needs nothing from the first.
+- **Revocation defeat (the strongest privacy claim, needs no second account).** A
+  user pastes a private/expiring link; the provider caches the content; the link
+  then expires or the share is revoked — but the provider keeps answering from its
+  stored copy. The harm is that pulling access does not pull the AI's copy. Leans
+  directly on retention (~1-day copy, Result 15) and the correction-latency /
+  robots-invalidation findings.
+
+Prior art, so novelty is claimed honestly: the cross-account leak is **web cache
+deception** (Omer Gil, 2017) — the classic "shared cache hands one user's private
+content to another." The taxonomy and the attack are not new; the new thing is the
+*target*, LLM retrieval caches. Frame it that way.
+
+## The HMAC's role — it is the ruler, not the secret
+
+The HMAC keyed code is **not** a credential being protected. It is a tamper-proof
+stamp that proves *which* page and version an asker actually received, so "answered
+from a stored copy" can be told apart from "made the answer up." A plain hash of the
+page id would be forgeable (the id is in the URL); the server secret makes the code
+unforgeable. Key it on `(id, version)` so a version bump is new content and a new
+code — that covers the staleness/mutation test too. Full build spec: TODO.md and
+study-plan.md § "per-page keyed code". It ships on a new route (e.g. `/cpage/<id>`)
+so the retention run's `/page/` bytes never move — blocked only until the retention
+run frees the origin (~Tue 2026-09-22 night).
+
+## What is actually left, in priority order
+
+1. **Web rungs 2 and 3 (small, no blockers, needs you at the browser):** run the
+   re-ask spot-checks — same chat, then new chat same login. Fills two cells now.
+2. **API rung 4 for Anthropic and xAI (blocked on procurement):** the moment a
+   second key/account exists it is `-sharing-test` with no new code. Highest-value
+   blocked cell — turns "cross-account on OpenAI only" into "across vendors."
+3. **Web rung 4 (blocked on a 2nd login + the keyed page):** hardest cell. Do it
+   for **one app only** — a single confirmed web cross-account instance makes the
+   grid look complete; a full sweep is not worth it.
+4. **Optional, if curious:** API rung 2 on OpenAI's Responses API — does chaining
+   `previous_response_id` reuse a fetch within a stored session? Small, untested,
+   nobody has looked.
+
+Rung 1 is **skipped** as a built experiment on both surfaces: it needs white-box
+knowledge of how the orchestrator splits work. Name it as the narrowest level, cite
+the Grok amplification as the one glimpse, move on.
+
+## Pointers
+
+- FINDINGS.md — Result 1c (OpenAI cross-account), Result 6 (address variation),
+  Result 8 (Grok amplification), Result 12 (cross-user, one OR account, with its
+  "honest limit"), Result 13 (cross-model), Result 15 (retention).
+- `trial/sharing.go` — the sharing runner (`-sharing-*`); `trial/openrouter.go` —
+  where the `user` field is injected; `trial/variations.go` — address variation;
+  `trial/providers.go:177` — OpenAI on `/v1/responses`.
+- `trial/main.go` — `-webtrial-reask` (329), `-webtrial-followups` (330,
+  `same-session` / `new-session`).
+- study-plan.md § web-app queue and § "per-page keyed code" — the keyed-page build.
+
+# Fault injection — method and prior art
+
+The failure-retry experiment measures what a provider's fetcher does when a
+fetch fails: does it retry, how many times, how fast, does it honour the
+back-off the server asks for, does it wander to addresses it was not given, and
+does it retry things a well-behaved client should leave alone.
+
+This note records the method and the references behind it, so they can be cited
+in a write-up. Implementation: `proxy/faults.go`, tests in
+`proxy/faults_test.go`.
+
+## Why this is a separate axis from caching
+
+The caching experiments ask what a provider does when a fetch **succeeds** —
+whether it comes back later. This asks what it does when a fetch **fails**, which
+is answered inside a single retrieval and does not depend on the caching window.
+So the long windows on Anthropic and xAI do not slow this down: every fault run
+uses a fresh address and reads the reaction from our own request log.
+
+## What prompted it
+
+Measured 2026-09-14 (FINDINGS.md § Google): Gemini's `url_context` fetched our
+page — HTTP 200, full body — and then fetched it again, and fetched the site root
+we never named: several fetches in seconds for one question, while reporting the
+retrieval as failed. No retry standard covers that, because from the server's
+side nothing failed. It has the shape of a **reflection-and-amplification**
+pattern: one cheap API call becomes several fetches aimed at a target the caller
+chooses, arriving from the provider's own addresses rather than the caller's, and
+— worst of all — the retrying is triggered *by failure*, so a server already
+struggling is hit harder rather than spared. Measuring the true amplification
+factor, and whether other providers do the same, is what this experiment is for.
+
+## The design
+
+**Trigger by path, not query.** Standard tools (httpbin, WireMock) select a fault
+with a query parameter. We cannot: a provider that strips the query would
+silently disable a query-triggered fault and be served a normal page instead —
+the one failure that would fabricate a result. A path trigger (`/fault/…`)
+survives query-stripping; the query is left to carry the `?probe=` token for
+attribution.
+
+**Read the reaction from our own log.** The faults only produce failures; the
+retry count, timing and any extra addresses come from the request log, the same
+way the address-variation experiment works. A fetch that arrives without its
+token but on the fault path, after our query, is attributed by a one-sided time
+window and reported as *untokenised* rather than as absent — so a stripped token
+becomes a visible, labelled event, and the gap between the token count and the
+timestamp count *is* the measurement of stripping.
+
+**Label each fault by whether a good client should retry it.** This turns the
+result from "what it did" into "whether that was correct" — the same shape as the
+address-variation result, where the standard says one thing and we check whether
+the provider agrees.
+
+| Path | Layer | Should a good client retry? | The standard it tests against |
+|---|---|---|---|
+| `/fault/404` | status | **no** — the page is gone | retrying a permanent (4xx) error is waste |
+| `/fault/500` | status | yes, then give up | 5xx is transient; back off, do not hammer |
+| `/fault/503` (+`Retry-After: 10`) | status | yes, after the asked delay | honour `Retry-After` (RFC 9110 §10.2.3) |
+| `/fault/slow` (~25 s) | timing | it is a slow success, not an error | a slow 200 is still a 200 |
+| `/fault/empty` | body | **no** — a valid empty 200 | a 200 is a success whatever its length |
+| `/fault/reset` | transport | yes | a dropped connection is retryable |
+| `/fault/flaky/N` | stateful | yes | does it retry *enough to recover* |
+
+`/fault/flaky/N` fails N times for a given caller, then serves the real page. It
+is the recovery test — the one thing a persistently-failing fault cannot measure.
+It keys a per-caller attempt counter on the `?probe=` token, so providers are
+counted separately; a caller that strips the token collapses into one bucket,
+which is a known limit of that one fault. The counter is in memory and resets on
+restart, so every run starts clean.
+
+Injecting only "500" gives shallow confidence — real dependencies fail at the
+transport, status, timing and body layers, and this set spans all four.
+
+## The transient-vs-permanent distinction
+
+The correctness verdict rests on a standard rule: **transient** failures (5xx,
+and 429) should be retried with back-off; **permanent** failures (most 4xx)
+should not. A fetcher that retries a 404 is wasting requests on a page that will
+never appear; one that ignores `Retry-After` on a 503 is guessing at a delay the
+server already gave it. Both are defects worth reporting if observed.
+
+## References (for citation)
+
+Method and tooling:
+
+- Toxiproxy — network-level fault injection (latency, dropped connections,
+  resets), Shopify. https://github.com/Shopify/toxiproxy
+- httpbin — HTTP request-and-response service with per-status and delay
+  endpoints, the closest existing analogue to this fault set.
+  https://httpbin.org
+- WireMock — response-level fault injection (status codes, malformed and
+- Fault-injection and chaos-testing practice, including the deliberate
+  "fail exactly N times then succeed" pattern that `/fault/flaky/N` implements:
+  https://qaskills.sh/blog/chaos-engineering-resilience-testing
+- Transient vs permanent failures, retries, timeouts and `Retry-After`:
+  https://totalshiftleft.ai/learn/testing/retries-and-timeouts
+
+Standards:
+
+- RFC 9110, HTTP Semantics — safe/idempotent methods, and `Retry-After`
+  (§10.2.3). https://www.rfc-editor.org/rfc/rfc9110
+- RFC 9111, HTTP Caching — cache key and revalidation, for the caching axis.
+  https://www.rfc-editor.org/rfc/rfc9111
+- RFC 9309, Robots Exclusion Protocol — the only crawler-specific standard; it
+  covers `robots.txt` reachability and retry (assume disallow on 5xx; ~30-day
+  unavailability rule) but says nothing about retrying ordinary pages.
+  https://www.rfc-editor.org/rfc/rfc9309
+
+All URLs retrieved 2026-09-14.
+
+# Decision note — negcache follow-up (a): a healthy page run beside the broken one
+
+Written 2026-09-20 by the scheduler session. Handoff for another session to build.
+This is a build spec, not a run log. Nothing here is frozen — see "Not blocked".
+
+## The one-line decision
+
+Add a normal, always-healthy page to the negative-caching test and ask about it on
+the exact same schedule as the broken-then-fixed page, over a ladder that runs out
+to about 30 hours. The healthy page is the ruler that tells us when a provider
+*would* naturally re-download, so a broken page that still isn't re-downloaded at
+that moment is the real finding.
+
+## Why the current test isn't enough
+
+The negative-caching test (Result 10, `trial/negrun.go`) puts up a page that is
+broken for its first minute, then fixes itself. It asks once (hits the failure),
+waits, then asks again about a different fact. If the provider comes back to look,
+it noticed the fix; if it doesn't come back, it's replaying "this page is broken"
+after the page is fine — the harm we're measuring.
+
+Claude (via OpenRouter) never came back within 30 minutes, so it looked like it
+holds a failure for at least half an hour. But the week-long retention run
+(Result 15) later showed Claude only re-downloads *any* page about once a day. So
+at 30 minutes it wouldn't have re-checked a perfectly healthy page either. Two
+different explanations produce the identical "it didn't come back":
+
+- it is stubbornly remembering the failure, or
+- it just never re-checks anything that fast, broken or not.
+
+The broken page alone cannot tell these apart. The 30-minute Claude number is
+confounded, with no upper bound.
+
+## The fix, on a clock
+
+Put up two pages at once: the broken-then-fixed one, and an ordinary healthy one.
+Ask about both at every rung of a ladder (● = a download reached our server,
+· = answered from a copy it already had):
+
+```
+T+0        ask both   (broken page is broken; healthy page is fine)   both ●
++~1 min    broken page heals itself
++15 min    ask both
++30 min    ask both
++2 h       ask both
++6 h       ask both
++12 h      ask both
++24 h      ask both
++30 h      ask both
+```
+
+Read it like this:
+
+- The moment the **healthy** page gets re-downloaded (●) but the once-broken page
+  still is not (·) → the failure is being held on its own separate timer. That is
+  real negative caching, and the gap between the two is how much longer a failure
+  sticks than an ordinary page.
+- If the two pages always move together → there is no special failure memory. What
+  Result 10 saw at 30 minutes was only the ordinary once-a-day re-download habit.
+
+The short rungs (15 and 30 minutes) still catch OpenAI, which forgot a failure
+somewhere between 15 and 30 minutes in Result 10.
+
+## What to build
+
+Extend the negative-caching runner (`trial/negrun.go`, entry `runNegCache`,
+reached by the `-negcache` flag; flags live in `trial/main.go:205`). Requirements,
+not code:
+
+1. **Pair a healthy control page with the broken one, per provider.** The healthy
+   page is an ordinary generated page under `/page/<id>` (`proxy/pages.go`) — no
+   server change needed, it already exists and carries a validator. Give it its
+   own fresh id so no other run's copy interferes.
+2. **Ask about both pages at each rung, same instant, same provider.** Keep the
+   existing rule that warm and re-ask use *different* questions the old answer
+   cannot satisfy (so "no re-download" can't be a replayed answer — see the header
+   comment in `negrun.go`). Apply the same different-question rule to the healthy
+   page across rungs.
+3. **Judge by the download in our server log, not the answer text.** Unchanged
+   from today (`judgeNeg`). The marker is corroboration at best.
+4. **Record, per rung: did the broken page get re-downloaded, did the healthy page
+   get re-downloaded.** The finding is the first rung where they differ.
+5. **Make the ladder configurable.** Today `-negcache-gaps` defaults to
+   `2m,5m,15m,30m`. The paired run needs it out to ~30h, e.g.
+   `15m,30m,2h,6h,12h,24h,30h`. Heal window stays short (`-negcache-heal`, default
+   60s) and must be shorter than the smallest gap — already enforced.
+
+**One design choice for the builder:** the current runner waits out each gap
+in-process. A 30-hour ladder means a 30-hour-long process, which is fragile. The
+retention run solved the same problem with a saved state file plus a cron tick
+(`bin/probe-retention-frozen -retention-tick`, state in
+`logs/retention-multiday.state.json`). Prefer that pattern here — a state file the
+tick advances — so a restart doesn't lose the run. Reuse it if cheap; otherwise a
+plain long-lived process is acceptable for a first pass.
+
+## Not blocked; safe to run beside the retention run
+
+- **No server change.** The healthy page already exists; the broken side uses the
+  `/fault/heal/<sec>` path, which carries no validator and cannot pollute a caching
+  run. So this does not need the origin restart that the object-size sweep and the
+  keyed-code page are waiting on.
+- **Safe alongside the retention cron.** It writes to the shared append-only log
+  and uses fresh page ids and fault paths distinct from the retention run's pages.
+  It does not touch anything under `probe-site/`.
+- Because the ladder needs a full day-plus to play out, this is a night-and-next-day
+  run: launch it, read it a day later. In the plan it is daytime work to build and a
+  nighttime item to launch (study-plan.md, both queues).
+
+## When to stop
+
+The result is settled once, for at least Claude and OpenAI, either: the two pages
+diverge at some rung (failure held longer than an ordinary page — report the gap),
+or they never diverge out to 30 hours (no special failure memory — Result 10's
+Claude number was the ordinary cache, not a failure hold). One run is a first pass;
+the plan calls for repeats before it is a result.

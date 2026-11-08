@@ -74,8 +74,8 @@ var defaultOpenRouterModels = []string{
 	// `Claude-User` — OpenRouter has no native Anthropic fetch path for that
 	// model and silently substitutes its own fetcher, so every result would be
 	// about OpenRouter's cache rather than Anthropic's. sonnet-5 was checked the
-	// same way and `anthropic-query` arrived. This is the failure D9 warns
-	// about, caught by -checkVendors exactly as intended.
+	// same way and `anthropic-query` arrived. This is the substitution failure,
+	// caught by -checkVendors exactly as intended.
 	//
 	// Dots, not dashes: "claude-sonnet-5" happens to be the same either way, but
 	// "claude-opus-4-8" is Anthropic's own API style and OpenRouter silently

@@ -212,22 +212,6 @@ func TestDepthFormatsValidUTF8(t *testing.T) {
 	}
 }
 
-// TestDepthFormatRawInjectsInvalidUTF8 guards the fault-injection path: the raw lines
-// (trimUTF8=false) must actually be invalid UTF-8 at a size where the normal lines are
-// valid — otherwise the /depthpdfrawpage/ bomb test would be serving clean content and
-// prove nothing.
-func TestDepthFormatRawInjectsInvalidUTF8(t *testing.T) {
-	const n = 4096 // where the original corruption surfaced
-	clean := strings.Join(depthFormatLinesOpt(depthFmtSecret, depthFmtID, n, true), "\n")
-	raw := strings.Join(depthFormatLinesOpt(depthFmtSecret, depthFmtID, n, false), "\n")
-	if !utf8.ValidString(clean) {
-		t.Error("normal (trimUTF8=true) payload must be valid UTF-8")
-	}
-	if utf8.ValidString(raw) {
-		t.Error("raw (trimUTF8=false) payload must be INVALID UTF-8 — the fault is not being injected")
-	}
-}
-
 func TestDepthFormatsDeterministic(t *testing.T) {
 	l1 := depthFormatLines(depthFmtSecret, depthFmtID, depthFmtBytes)
 	l2 := depthFormatLines(depthFmtSecret, depthFmtID, depthFmtBytes)

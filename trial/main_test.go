@@ -650,7 +650,7 @@ func TestDryRunBackstopRefusesEveryProviderCall(t *testing.T) {
 	}
 }
 
-// POLICY (BULLETIN 2026-10-11): every Anthropic call uses Sonnet 5. Haiku cannot
+// POLICY (2026-10-11): every Anthropic call uses Sonnet 5. Haiku cannot
 // fetch a page (direct: nothing; OpenRouter: its own fetcher answers instead), so it
 // must never be what a run gets by leaving -anthropicModel unset.
 func TestDefaultAnthropicModelIsSonnet(t *testing.T) {

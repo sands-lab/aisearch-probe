@@ -35,8 +35,8 @@ import (
 )
 
 // defaultAnthropicModel is what a direct Anthropic run gets without
-// -anthropicModel. Sonnet 5, never Haiku: Haiku cannot fetch a page (BULLETIN
-// 2026-10-11, DECISIONS D9), so a Haiku default silently voided Anthropic results.
+// -anthropicModel. Sonnet 5, never Haiku: Haiku cannot fetch a page
+// (measured 2026-10-11), so a Haiku default silently voided Anthropic results.
 const defaultAnthropicModel = "claude-sonnet-5"
 
 func main() {

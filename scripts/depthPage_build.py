@@ -1,80 +1,127 @@
 #!/usr/bin/env python3
-"""Build the frozen filler corpus for the truncation-depth probe (/depthpage/).
+"""Build the filler text of the depth pages (proxy/depthcorpus.txt).
 
-The depth page needs realistic prose as filler so a fetcher's readability
-extractor keeps the page (a wall of one repeated character gets discarded as
-junk — see doc/truncation-depth-probe-design.md). The filler is a SNAPSHOT of
-this project's own findings notes, frozen so the page stays a pure function of
-(id, bytes) and the run is reproducible.
+A depth page carries unforgeable marker codes at known depths, padded with real
+prose. Real prose matters: a fetcher's text extractor keeps prose, but may throw
+away a wall of repeated characters, and then the markers never reach the model.
+The Go server embeds the built file, so the page is a pure function of its address.
 
-Two rules make it safe (both enforced by tests over the frozen output):
+Usage:
+  scripts/depthPage_build.py                       # from the text shipped with the release
+  scripts/depthPage_build.py --input my-text.txt   # from your own text file
+  scripts/depthPage_build.py --input pg219.txt     # a raw Project Gutenberg file works too
+  options: --output FILE (default proxy/depthcorpus.txt)
 
-  1. NO COLLISION. The marker prefix `TRUNC-` must never appear in the filler, or
-     a marker could be faked by the filler. We drop every line that mentions the
-     marker scheme (trunc/depthpage/sizepage/objsize/the shared RCP marker) or
-     carries a code-shaped hex run.
-  2. NOT SELF-DESCRIBING. Lines that narrate THIS probe are dropped by the same
-     rule, so the page does not explain its own experiment to the model reading it.
+The shipped text (scripts/depthPage_source.txt) is Joseph Conrad's "Heart of
+Darkness" (1899), a public-domain book, taken from Project Gutenberg with Project
+Gutenberg's own header and licence footer cut off.
 
-Provenance: run against a committed tree; record the commit in the design doc.
-The frozen output (proxy/depthcorpus.txt) is committed alongside this recipe.
+What the builder does to any input:
+  1. If the text has Project Gutenberg's "*** START OF" and "*** END OF" lines,
+     it keeps only what lies between them.
+  2. It turns Windows line ends into plain ones and curly quotes and long dashes
+     into plain ASCII ones.
+  3. It drops every line that could spell or describe a marker: anything with
+     "trunc" in it (the marker prefix is TRUNC-), the words the page prints next to
+     a marker ("reference marker"), or a run of 12 or more hex characters (a code).
+  4. It refuses to write a result that still contains the marker prefix, or that is
+     too short to fill a page (under 1 KB).
+
+After a rebuild, rebuild the server (go build ./proxy) so it embeds the new text.
+Pages built from a different text are different pages: their sizes and codes stay
+the same, but their token counts can change.
 """
 
+import argparse
 import os
 import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "proxy", "depthcorpus.txt")
+DEFAULT_INPUT = os.path.join(REPO, "scripts", "depthPage_source.txt")
+DEFAULT_OUTPUT = os.path.join(REPO, "proxy", "depthcorpus.txt")
 
-# Findings prose to snapshot. Big, prose-rich docs about the caching results —
-# NOT the docs that describe the size/truncation probes themselves.
-SOURCE_GLOBS = [
-    "DECISIONS.md",
-    "RUNBOOK.md",
-    "doc/study-plan.md",
-    "doc/open-measurements.md",
-    "doc/caching-policy-refs.md",
-    "doc/cache-scope-framework.md",
-    "doc/fault-injection.md",
-    "doc/negcache-paired-handover.md",
-]
+MARKER_PREFIX = "TRUNC-"
+MIN_BYTES = 1024
 
-# A line matching any of these is dropped: it mentions the marker scheme, this
-# probe, the shared marker, or carries a code-shaped hex run.
-DROP = re.compile(
-    r"trunc|depthpage|sizepage|objsize|page-code-secret|PROBE_PAGE_CODE|RCP-2026-08|\b[0-9a-f]{12,}\b",
-    re.IGNORECASE,
-)
+# A line matching this is dropped: it could spell or describe a marker.
+DROP = re.compile(r"trunc|reference marker|\b[0-9a-f]{12,}\b", re.IGNORECASE)
+
+PUNCT = {
+    "‘": "'", "’": "'", "“": '"', "”": '"',
+    "—": "--", "–": "-", "…": "...", " ": " ", "﻿": "",
+}
+
+START = re.compile(r"^\*\*\* ?START OF (THE|THIS) PROJECT GUTENBERG", re.IGNORECASE)
+END = re.compile(r"^\*\*\* ?END OF (THE|THIS) PROJECT GUTENBERG", re.IGNORECASE)
 
 
-def main():
-    parts = []
-    used = []
-    for rel in SOURCE_GLOBS:
-        path = os.path.join(REPO, rel)
-        if not os.path.exists(path):
+def cut_gutenberg(text):
+    """Keep only the book between Project Gutenberg's START and END lines, if any."""
+    lines = text.split("\n")
+    start = next((i for i, l in enumerate(lines) if START.match(l)), None)
+    end = next((i for i, l in enumerate(lines) if END.match(l)), None)
+    if start is None and end is None:
+        return text
+    lo = start + 1 if start is not None else 0
+    hi = end if end is not None and end > lo else len(lines)
+    return "\n".join(lines[lo:hi])
+
+
+def normalise(text):
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    for a, b in PUNCT.items():
+        text = text.replace(a, b)
+    return text
+
+
+def clean(text):
+    """The whole pipeline: returns (corpus, number of lines dropped)."""
+    text = normalise(cut_gutenberg(normalise(text)))
+    kept, dropped = [], 0
+    for line in text.split("\n"):
+        if DROP.search(line):
+            dropped += 1
             continue
-        with open(path, encoding="utf-8") as f:
-            kept = [ln for ln in f.read().splitlines() if not DROP.search(ln)]
-        parts.append("\n".join(kept))
-        used.append(rel)
+        kept.append(line.rstrip())
+    corpus = "\n".join(kept).strip() + "\n"
+    # Squeeze runs of blank lines: they are padding, not prose.
+    corpus = re.sub(r"\n{3,}", "\n\n", corpus)
+    return corpus, dropped
 
-    corpus = "\n\n".join(parts).strip() + "\n"
 
-    # Hard guarantee before writing: the reserved prefix must be absent.
-    if "TRUNC-" in corpus:
-        print("ERROR: reserved prefix TRUNC- survived sanitisation", file=sys.stderr)
-        sys.exit(1)
+def check(corpus):
+    """Reasons the corpus must not be written; empty when it is fine."""
+    problems = []
+    if MARKER_PREFIX.lower() in corpus.lower():
+        problems.append(f"the marker prefix {MARKER_PREFIX} survived the cleaning")
+    if len(corpus.encode("utf-8")) < MIN_BYTES:
+        problems.append(f"the text is under {MIN_BYTES} bytes after cleaning")
+    return problems
 
-    with open(OUT, "w", encoding="utf-8") as f:
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Build proxy/depthcorpus.txt, the depth pages' filler text.")
+    ap.add_argument("--input", default=DEFAULT_INPUT,
+                    help="your own plain-text file (UTF-8); default: the shipped public-domain book")
+    ap.add_argument("--output", default=DEFAULT_OUTPUT, help="where to write (default: proxy/depthcorpus.txt)")
+    args = ap.parse_args(argv)
+
+    with open(args.input, encoding="utf-8") as f:
+        corpus, dropped = clean(f.read())
+    problems = check(corpus)
+    if problems:
+        for p in problems:
+            print("ERROR:", p, file=sys.stderr)
+        return 1
+    with open(args.output, "w", encoding="utf-8") as f:
         f.write(corpus)
-
-    print(f"wrote {OUT}")
-    print(f"  sources: {', '.join(used)}")
-    print(f"  bytes:   {len(corpus.encode('utf-8'))}")
-    print(f"  TRUNC- occurrences: {corpus.count('TRUNC-')} (must be 0)")
+    print(f"wrote {args.output}")
+    print(f"  from:          {args.input}")
+    print(f"  bytes:         {len(corpus.encode('utf-8'))}")
+    print(f"  lines dropped: {dropped}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

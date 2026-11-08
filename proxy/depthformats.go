@@ -40,11 +40,7 @@ func depthFormatLines(secret, id string, nbytes int) []string {
 }
 
 // depthFormatLinesOpt is depthFormatLines with a UTF-8 safety switch. trimUTF8=true is
-// the normal, correct payload (every line valid UTF-8). trimUTF8=false DELIBERATELY
-// leaves the pre-fix corruption in (filler lines chopped mid-character) — a fault
-// injection used ONLY by the /depthpdfrawpage/ investigation route to test whether
-// invalid-UTF-8 content is what triggered Anthropic's pause_turn bomb. Nothing on the
-// normal path passes false.
+// the normal, correct payload (every line valid UTF-8); every route passes true.
 func depthFormatLinesOpt(secret, id string, nbytes int, trimUTF8 bool) []string {
 	return depthFormatLinesRev(secret, id, nbytes, trimUTF8, probe.DepthPageRevision)
 }
@@ -93,8 +89,7 @@ func depthCorpusLine(ci *int, n int) string {
 // UTF-8, which OpenAI's fetcher rejects with a 400 Unicode decoding error (measured
 // 2026-10-06 at 4 KB; Anthropic/xAI silently read the corrupted bytes). With trimUTF8
 // (the normal path) we drop any incomplete trailing rune so the line is always valid.
-// trimUTF8=false deliberately keeps the chopped rune — the pre-fix corruption — for the
-// /depthpdfrawpage/ bomb investigation ONLY.
+// trimUTF8=false keeps the chopped rune; no route uses it.
 func depthCorpusLineOpt(ci *int, n int, trimUTF8 bool) string {
 	b := make([]byte, 0, n)
 	for len(b) < n {
@@ -130,26 +125,7 @@ func buildDepthFormat(s *staticServer, w http.ResponseWriter, r *http.Request, p
 	}
 	lines := depthFormatLines(s.pageCodeSecret, id, nbytes)
 	// Realistic header (omit Cache-Control) — these are read-depth/format experiments,
-	// NOT cache-control tests, so no-store would be an abnormal setup (BULLETIN 2026-10-04).
-	return render(lines), name, contentType, pageHeaders{}, true
-}
-
-// buildDepthFormatRaw is buildDepthFormat with the UTF-8 safety trim DISABLED — it
-// serves the pre-fix invalid-UTF-8 payload on purpose. FAULT INJECTION for the
-// pause_turn bomb investigation (was corrupted content the trigger?): only the explicit
-// /depthpdfrawpage/ route calls it, so no normal run can serve corruption by accident.
-func buildDepthFormatRaw(s *staticServer, w http.ResponseWriter, r *http.Request, prefix string,
-	render func(lines []string) []byte, name, contentType string) ([]byte, string, string, pageHeaders, bool) {
-	id, nbytes, ok := parseSizePath(w, r, prefix, maxDepthPageBytes)
-	if !ok {
-		return nil, "", "", pageHeaders{}, false
-	}
-	if nbytes < minDepthFormatBytes {
-		http.Error(w, fmt.Sprintf("depth page too small: %d bytes cannot hold the markers", nbytes), http.StatusBadRequest)
-		return nil, "", "", pageHeaders{}, false
-	}
-	lines := depthFormatLinesOpt(s.pageCodeSecret, id, nbytes, false) // NO trim -> invalid UTF-8
-	// Realistic header (omit Cache-Control), same as buildDepthFormat — not a cache test.
+	// NOT cache-control tests, so no-store would be an abnormal setup.
 	return render(lines), name, contentType, pageHeaders{}, true
 }
 
@@ -237,15 +213,6 @@ func renderDepthPDF(lines []string) []byte {
 func (depthPdfRoute) build(s *staticServer, w http.ResponseWriter, r *http.Request) ([]byte, string, string, pageHeaders, bool) {
 	return buildDepthFormat(s, w, r, depthPdfPrefix, renderDepthPDF, "depth.pdf", "application/pdf")
 }
-
-// --- /depthpdfrawpage/ — FAULT INJECTION, investigation only ----------------
-// Serves the PDF built from the pre-fix INVALID-UTF-8 payload (chopped multi-byte
-// chars), to test whether that corruption is what triggered Anthropic's pause_turn cost
-// bomb (the clean /depth/pdf/ never bombs — FINDINGS). Deliberately NOT a general
-// format route: it exists only so one Anthropic call can be run against corrupted PDF
-// bytes and its `rounds` compared to the clean one. Retire once the question is settled.
-
-const depthPdfRawPrefix = "/depthpdfrawpage/"
 
 // --- /depth/docx/ -------------------------------------------------------
 
@@ -344,7 +311,7 @@ func (depthCtRoute) build(s *staticServer, w http.ResponseWriter, r *http.Reques
 	// The body is the SAME line-based bytes for every token — only ct changes.
 	lines := depthFormatLines(s.pageCodeSecret, parts[1], nbytes)
 	// Realistic header (omit Cache-Control) — this is the content-type lever, not a
-	// cache-control test (BULLETIN 2026-10-04).
+	// cache-control test.
 	return renderDepthTxt(lines), "depth.txt", ct, pageHeaders{}, true
 }
 

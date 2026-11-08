@@ -39,20 +39,30 @@ copy's lifetime.
 
 ## Run it
 
-```
-./bin/probe-trial -cacheHeaders-run -siteUrl https://<your domain> -serverLog logs/probe.jsonl \
-    -cacheHeaders-askAgainTimes 2m30s,5m,10m,20m,40m,80m \
-    -vendors or:openai,anthropic,or:x-ai -anthropicModel claude-sonnet-5 \
-    -anthropicFetchTool web_fetch_20250910
-```
+One command runs the whole test. The last question comes 80 minutes after the first ask, so it
+takes at least that long, and longer with many pages (19 settings × vendors × repeats).
 
-Only one cache-header run at a time (it takes its own lock).
+1. **Choose the settings to test.** By default all 19 pages run. To re-check a few, list their
+   labels (`cc-<setting>-<validators>`) with `-cacheHeaders-settings`, for example
+   `cc-nostore-tag,cc-private-tag`.
+
+2. **Run the test.** The runner puts up one fresh page per vendor and setting, asks about each
+   once, then asks again at each of the listed times until the vendor downloads the page again.
+   The time of that new download is the result for that page. Only one cache-header run can go
+   at a time.
+
+   ```
+   ./bin/probe-trial -cacheHeaders-run -siteUrl https://<your domain> -serverLog logs/probe.jsonl \
+       -cacheHeaders-askAgainTimes 2m30s,5m,10m,20m,40m,80m \
+       -vendors or:openai,anthropic,or:x-ai -anthropicModel claude-sonnet-5 \
+       -anthropicFetchTool web_fetch_20250910
+   ```
 
 | Switch | What it does |
 |---|---|
-| `-cacheHeaders-settings` | Run only these pages, e.g. `cc-nostore-tag,cc-combo-tag,cc-private-tag,cc-nocache-tag,cc-none-tag` (default all 19; labels are `cc-<setting>-<validators>`) |
+| `-cacheHeaders-settings` | Run only these pages (default all 19) |
 | `-cacheHeaders-askAgainTimes` | When to ask again; each gap at least 150 s, rising |
-| `-cacheHeaders-askAfterRefetch` | Keep asking at every gap even after the vendor downloads again (default: stop at the first download) |
+| `-cacheHeaders-askAfterRefetch` | Keep asking at every time even after the vendor downloads again (default: stop at the first new download) |
 | `-cacheHeaders-repeats` | Fresh pages per vendor and setting (default 8) |
 | `-cacheHeaders-pageSize` | Page size (default 2048) |
 

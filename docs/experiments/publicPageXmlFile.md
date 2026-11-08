@@ -17,20 +17,46 @@ a contrast, llms.txt files served as `text/plain`. Read [publicPage.md](publicPa
 
 ## Run it
 
-```
-export PROBE_CONTACT=<your contact>
-python3 scripts/publicPageXmlFile_select.py work/sites.txt work/files
-python3 scripts/publicPageXmlFile_run.py select work/files/files-all-<time>.jsonl work/files-test.jsonl
-python3 scripts/publicPageXmlFile_run.py keys work/files-test.jsonl work/keys-start.jsonl    # on the download server
-python3 scripts/publicPageXmlFile_run.py ask work/files-test.jsonl work/answers.jsonl --vendors openai,anthropic,xai,google --no-pause
-python3 scripts/publicPageXmlFile_run.py keys work/files-test.jsonl work/keys-end.jsonl      # on the download server
-```
+Set `PROBE_CONTACT=<your contact>` first. File names below are examples.
 
-`ask` runs one lane per vendor, one call every 3 minutes, and can be restarted; a file named
-`STOP` next to the answers file ends it cleanly. Without `--no-pause` the Google lane pauses
-from 07:00 to 09:30 UTC each day (a quiet window kept from the original run; not needed
-otherwise). Copy `work/files-test.jsonl` to the download server for the `keys` steps and the key
-files back.
+1. **Find the files.** Looks for each site's sitemaps, feeds and llms.txt in the standard
+   places, using the site list from the [homepage test](publicPageHomepage.md):
+
+   ```
+   python3 scripts/publicPageXmlFile_select.py work/sites.txt work/files
+   ```
+
+2. **Pick the test files.** Keeps the files that answered, are allowed by robots.txt and are big
+   enough to test:
+
+   ```
+   python3 scripts/publicPageXmlFile_run.py select work/files/files-all-<time>.jsonl work/files-test.jsonl
+   ```
+
+3. **Take the answer key.** On your download server, download each test file and keep its first
+   lines; the answers are checked against these. Copy `work/files-test.jsonl` there first and the
+   key file back afterwards.
+
+   ```
+   python3 scripts/publicPageXmlFile_run.py keys work/files-test.jsonl work/keys-start.jsonl
+   ```
+
+4. **Ask the services.** Asks each service to quote each file's first 3 lines, one call every 3
+   minutes per service. It can be restarted, and a file named `STOP` next to the answers file ends
+   it cleanly. Use `--no-pause`: without it, Google's questions pause from 07:00 to 09:30 UTC each
+   day, a quiet window kept from the original run.
+
+   ```
+   python3 scripts/publicPageXmlFile_run.py ask work/files-test.jsonl work/answers.jsonl \
+       --vendors openai,anthropic,xai,google --no-pause
+   ```
+
+5. **Take the answer key again.** Files can change during the run, so a second key, taken right
+   after, lets an answer match either version:
+
+   ```
+   python3 scripts/publicPageXmlFile_run.py keys work/files-test.jsonl work/keys-end.jsonl
+   ```
 
 ## Reading the result and the figure
 

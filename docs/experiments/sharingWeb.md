@@ -22,19 +22,26 @@ downloads into before and after the answer.
 
 ## Run it
 
-```
-./bin/probe-trial -sharingWeb-run -siteUrl https://<your domain> -serverLog logs/probe.jsonl \
-    -sharingWeb-apps claude,chatgpt,gemini,grok
-```
+1. **Prepare two logins per app.** For each chat app you want to test, have two different
+   accounts logged in, each in its own browser profile, so the two never share cookies. Run the
+   helper on the server machine: it splits downloads into before and after each pasted answer,
+   so it needs the up-to-date server log. No API keys are needed.
+
+2. **Start the helper and follow its prompts.** It prints, one at a time, which app and which
+   account to use and the exact prompt to paste. After you paste the app's reply into the editor
+   it opens (`$EDITOR`), it moves on. At the end it waits 30 seconds, reads the log again and
+   prints the verdicts.
+
+   ```
+   ./bin/probe-trial -sharingWeb-run -siteUrl https://<your domain> -serverLog logs/probe.jsonl \
+       -sharingWeb-apps claude,chatgpt,gemini,grok
+   ```
 
 | Switch | What it does |
 |---|---|
 | `-sharingWeb-apps` | Apps in this sitting (default `claude,chatgpt,gemini,grok,deepseek,mistral,qwen,metaai`) |
 | `-sharingWeb-firstAccount`, `-sharingWeb-secondAccount` | Labels for the two logins (default `account-a`, `account-b`) |
 | `-sharingWeb-secondAskGap` | Wait from A's ask to B's ask, per app (default 5 min) |
-
-No API keys are needed. The runner must read an up-to-date server log, because it splits
-downloads into before and after each pasted answer; run it on the server machine.
 
 ## Reading the result
 

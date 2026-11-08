@@ -28,22 +28,38 @@ log for late retries, and counts the requests.
 
 ## Run it
 
-```
-./bin/probe-trial -fault-run -siteUrl https://<your domain> -serverLog logs/probe.jsonl \
-    -vendors or:openai,anthropic,or:x-ai -anthropicModel claude-sonnet-5 \
-    -anthropicFetchTool web_fetch_20250910 -fault-outFile logs/faults-run1.jsonl
-```
+Two runs: the fault run itself, and a baseline run on a page that works, which the figure
+compares the faults against.
 
-Before any paid call it checks that it can read a fault page's codes with its own secret.
+1. **Ask about every failing page.** For each vendor, the runner asks about each fault page in
+   turn, then waits 90 seconds (`-fault-retryWait`) while it counts the vendor's retries in the
+   server log. With 12 faults and 3 vendors that takes roughly an hour. Before the first paid
+   question it checks that it can read a fault page's codes with your secret, so a wrong secret
+   costs nothing.
 
-Success baseline for the token figure: the same command with `-fault-kinds flaky/0`.
+   ```
+   ./bin/probe-trial -fault-run -siteUrl https://<your domain> -serverLog logs/probe.jsonl \
+       -vendors or:openai,anthropic,or:x-ai -anthropicModel claude-sonnet-5 \
+       -anthropicFetchTool web_fetch_20250910 -fault-outFile logs/faults-run1.jsonl
+   ```
+
+2. **Ask about a page that works, for the baseline.** The same command, asking only about
+   `flaky/0` (a fault page that answers normally at once). This gives the token cost of an
+   ordinary fetch, to compare the faults against.
+
+   ```
+   ./bin/probe-trial -fault-run -fault-kinds flaky/0 -siteUrl https://<your domain> \
+       -serverLog logs/probe.jsonl -vendors or:openai,anthropic,or:x-ai \
+       -anthropicModel claude-sonnet-5 -anthropicFetchTool web_fetch_20250910 \
+       -fault-outFile logs/faults-baseline.jsonl
+   ```
 
 | Switch | What it does |
 |---|---|
 | `-fault-kinds` | Which faults to ask about (default: all) |
 | `-fault-retryWait` | How long to watch the log after each question for late retries (default 90 s, at least 45 s) |
 | `-fault-outFile` | Per-fault results |
-| `-fault-runTag` | Tag put into every fault address so a repeat gets fresh addresses (default: time plus random) |
+| `-fault-runTag` | Tag put into every fault address, so a repeat run gets new addresses (default: time plus random) |
 
 ## Reading the result
 

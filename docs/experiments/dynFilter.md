@@ -15,19 +15,26 @@ at different times or dates show how much the cost moves from run to run.
 
 ## Run it
 
-Three rounds, at least hours apart:
+1. **Run one round.** A round asks about every test page twice on your own Anthropic key, once
+   with the old fetch tool (filtering off) and once with the new one (filtering on). The script
+   does this for the 8 document types at 8 KB, and for HTML at 32 and 64 KB:
 
-```
-SITE_URL=https://<your domain> scripts/dynFilter_run.sh r1
-SITE_URL=https://<your domain> scripts/dynFilter_run.sh r2
-SITE_URL=https://<your domain> scripts/dynFilter_run.sh r3
-```
+   ```
+   SITE_URL=https://<your domain> scripts/dynFilter_run.sh r1
+   ```
 
-The script runs `probe-trial -readDepth-run -vendors anthropic -anthropicFetchTool <version>` for
-each page and size. Settings: `SITE_URL` (required), `SERVER_LOG` (default `logs/probe.jsonl`),
-`BIN` (default `./bin/probe-trial`), `MODEL` (default `claude-sonnet-5`). Every whole reply is
-kept in `logs/dynFilter-<round>-replies.jsonl`, which shows the code-execution steps behind the
-cost.
+   It needs `SITE_URL`. `SERVER_LOG` (default `logs/probe.jsonl`), `BIN` (default
+   `./bin/probe-trial`) and `MODEL` (default `claude-sonnet-5`) are optional. Every whole reply is
+   kept in `logs/dynFilter-r1-replies.jsonl`; those replies show the code Claude ran to filter
+   the page, which is where the extra tokens go.
+
+2. **Run two more rounds at other times.** The cost of one fetch moves from run to run, so the
+   result pools three rounds. Run them hours or days apart:
+
+   ```
+   SITE_URL=https://<your domain> scripts/dynFilter_run.sh r2
+   SITE_URL=https://<your domain> scripts/dynFilter_run.sh r3
+   ```
 
 ## Reading the result and the figure
 

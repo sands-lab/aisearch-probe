@@ -21,16 +21,25 @@ the site's `Cache-Control` make a difference? No server of your own is needed.
 
 ## Run it
 
-Start both, side by side (in `tmux` or similar), for about three days:
+Two programs run side by side for about three days: one asks the AI services, the other records
+the true values to compare their answers against. Start both in `tmux` or similar.
 
-```
-python3 scripts/publicPageEndpoint_poll.py logs/results/endpoint-truth.jsonl 300 259200
-python3 scripts/publicPageEndpoint_run.py logs/results/endpoint-answers.jsonl \
-    --rounds 96 --interval 2700 --jitter 300 --anthropic-cap 30
-```
+1. **Record the true values.** Reads each endpoint's live value every 5 minutes and logs it. It
+   makes no AI calls and costs nothing. Here, every 300 s for 3 days (259,200 s):
 
-Keys: `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`. `--dry` makes no call.
-`--vendors` and `--anchors` narrow the run.
+   ```
+   python3 scripts/publicPageEndpoint_poll.py logs/results/endpoint-truth.jsonl 300 259200
+   ```
+
+2. **Ask the AI services.** Every 45 minutes (with up to 5 minutes of random jitter) it asks each
+   vendor for each endpoint's value, 96 rounds in all. Anthropic stops once its estimated spend
+   reaches `--anthropic-cap` dollars. Needs `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY` and
+   `GEMINI_API_KEY`; `--dry` prints the plan without calling anyone.
+
+   ```
+   python3 scripts/publicPageEndpoint_run.py logs/results/endpoint-answers.jsonl \
+       --rounds 96 --interval 2700 --jitter 300 --anthropic-cap 30
+   ```
 
 ## Figure
 

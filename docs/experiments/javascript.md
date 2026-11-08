@@ -23,18 +23,23 @@ script file shows in the server log as requests for `/depth/jsExternalScript/`.
 
 ## Run it
 
-Once per version:
+1. **Ask about each page version.** Run this once per version, changing the page kind:
+   `/depth/html/` (the baseline), `/depth/jsInline/`, `/depth/jsExternal/`, `/depth/jsData/`,
+   `/depth/jsonLd/`. Here, the inline script:
 
-```
-./bin/probe-trial -readDepth-run -readDepth-page /depth/jsInline/ -readDepth-sizes 4k \
-    -vendors anthropic,or:openai,or:x-ai -anthropicModel claude-sonnet-5 \
-    -anthropicFetchTool web_fetch_20250910 \
-    -siteUrl https://<your domain> -serverLog logs/probe.jsonl
-```
+   ```
+   ./bin/probe-trial -readDepth-run -readDepth-page /depth/jsInline/ -readDepth-sizes 4k \
+       -vendors anthropic,or:openai,or:x-ai -anthropicModel claude-sonnet-5 \
+       -anthropicFetchTool web_fetch_20250910 \
+       -siteUrl https://<your domain> -serverLog logs/probe.jsonl
+   ```
 
-The basic Anthropic fetch tool (`web_fetch_20250910`) is pinned on purpose: the newer one runs
-code on the fetched page, which could unscramble the script itself. To check whether that
-matters, repeat with `-vendors anthropic -anthropicFetchTool web_fetch_20260209`.
+   Anthropic uses its basic fetch tool here (`web_fetch_20250910`), which only downloads the
+   page. The newer tool can run code on the page, which is a different question (step 2).
+
+2. **Optional: try Anthropic's newer fetch tool.** It can run code on the fetched page, so it
+   could in principle unscramble the script itself. Repeat step 1 with
+   `-vendors anthropic -anthropicFetchTool web_fetch_20260209` to see whether it does.
 
 ## Reading the result
 

@@ -21,39 +21,61 @@ download server.
 
 ## Run it
 
+Four stages, each feeding the next. File names below are examples. Set these first:
+
 ```
 export PROBE_CONTACT=<your contact>  PROBE_SNAP_HOST=<ssh host>  PROBE_SNAP_DIR=<folder with scripts/>
-
-# 1. site list: first visit (writes work/scan/sites-seed<N>.txt and scan-<time>.jsonl;
-#    uses ..._select_cacheHeaders.py), then the filters
-python3 scripts/publicPageHomepage_select_sites.py <crux.csv.gz> work/scan
-python3 scripts/publicPageHomepage_select_adultSites.py work/scan/sites-seed<N>.txt work/adult.jsonl
-python3 scripts/publicPageHomepage_select_urlScanSearch.py work/scan/sites-seed<N>.txt work/search.jsonl
-python3 scripts/publicPageHomepage_select_urlScanSubmit.py submit work/scan/sites-seed<N>.txt work/submitted.jsonl  # optional
-python3 scripts/publicPageHomepage_select_urlScanSubmit.py read work/submitted.jsonl work/new-results.jsonl
-#    then write work/sites.txt: one site per line, the sites that answered on the first visit,
-#    let in our name in robots.txt, and passed both filters
-
-# 2. watch (on the download server; writes work/watch/watch-<time>.jsonl and work/watch/snapshots/),
-#    then find the changing pages
-python3 scripts/publicPageHomepage_poll.py work/sites.txt work/watch --groups 2 --hours 24
-python3 scripts/publicPageHomepage_select_changes.py work/watch/watch-<time>.jsonl work/watch/snapshots \
-    work/candidates.jsonl work/search.jsonl,work/new-results.jsonl
-
-# 3. anchors
-python3 scripts/publicPageHomepage_select_anchor.py anchors work/candidates.jsonl work/watch/watch-<time>.jsonl \
-    work/watch/snapshots work/anchors.jsonl
-
-# 4. plan and run (all times UTC)
-python3 scripts/publicPageHomepage_run.py plan work/anchors.jsonl work/candidates.jsonl \
-    2026-12-01T09:00:00Z work/plan.jsonl
-python3 scripts/publicPageHomepage_run.py run work/plan.jsonl work/answers.jsonl --vendors openai,anthropic,xai
 ```
 
-The two URL Scanner steps need `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The run step
-writes its downloads next to the answers (`work/answers.jsonl.copies.jsonl`); a restart skips
-pages already finished. Each script's own notes (`--help` or the top of the file) give the
-remaining options; the file names above are examples.
+1. **Build the site list.** Start from a list of popular sites (a Chrome UX Report, CrUX, file),
+   visit each homepage once, and drop adult sites and sites in excluded categories. The first
+   visit writes `work/scan/sites-seed<N>.txt` and `work/scan/scan-<time>.jsonl`.
+
+   ```
+   python3 scripts/publicPageHomepage_select_sites.py <crux.csv.gz> work/scan
+   python3 scripts/publicPageHomepage_select_adultSites.py work/scan/sites-seed<N>.txt work/adult.jsonl
+   python3 scripts/publicPageHomepage_select_urlScanSearch.py work/scan/sites-seed<N>.txt work/search.jsonl
+   ```
+
+   Optional, for sites with no recent Cloudflare URL Scanner result (needs
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`):
+
+   ```
+   python3 scripts/publicPageHomepage_select_urlScanSubmit.py submit work/scan/sites-seed<N>.txt work/submitted.jsonl
+   python3 scripts/publicPageHomepage_select_urlScanSubmit.py read work/submitted.jsonl work/new-results.jsonl
+   ```
+
+   Then write `work/sites.txt`, one site per line: the sites that answered on the first visit,
+   allow our name in robots.txt, and passed both filters.
+
+2. **Find the pages that change often.** On your download server, download each homepage every
+   10 minutes for 24 hours. Then keep the pages whose real content changes within 20 minutes,
+   because the test waits 20 minutes between questions.
+
+   ```
+   python3 scripts/publicPageHomepage_poll.py work/sites.txt work/watch --groups 2 --hours 24
+   python3 scripts/publicPageHomepage_select_changes.py work/watch/watch-<time>.jsonl work/watch/snapshots \
+       work/candidates.jsonl work/search.jsonl,work/new-results.jsonl
+   ```
+
+3. **Pick an anchor for each page.** An anchor is a short, stable label just above the changing
+   part (for example a section heading). The test asks each service to quote the words after it,
+   so this step also checks that every service can find it.
+
+   ```
+   python3 scripts/publicPageHomepage_select_anchor.py anchors work/candidates.jsonl \
+       work/watch/watch-<time>.jsonl work/watch/snapshots work/anchors.jsonl
+   ```
+
+4. **Run the test.** First make the schedule (each page starts in an hour when it usually
+   changes; all times UTC), then carry it out. The run downloads its own copies of each page
+   before and after the questions; a restart skips pages already finished.
+
+   ```
+   python3 scripts/publicPageHomepage_run.py plan work/anchors.jsonl work/candidates.jsonl \
+       2026-12-01T09:00:00Z work/plan.jsonl
+   python3 scripts/publicPageHomepage_run.py run work/plan.jsonl work/answers.jsonl --vendors openai,anthropic,xai
+   ```
 
 ## Reading the result
 

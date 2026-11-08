@@ -16,8 +16,9 @@ site owners, people who write crawler or caching policy.
   tests. The public-page tests also use only Python.
 - **API keys**: either each vendor's own key, or one OpenRouter key. See [docs/keys.md](docs/keys.md).
 - **Two secrets** you make up yourself:
-  - the page-code secret (`PROBE_PAGE_CODE_SECRET`). The server uses it to print an
-    unforgeable code on every page; the runner uses the same secret to check answers.
+  - the page-code secret (`PROBE_PAGE_CODE_SECRET`). The server uses it to work out the short
+    codes it prints on each test page (e.g. `TRUNC-13de1433e2ee`). Without the secret nobody can
+    guess them. The runner uses the same secret to check which codes an answer quotes.
   - the control password (`PROBE_CONTROL_SECRET`). The runner uses it to change or fix pages on
     the server during the correction and heal tests.
 

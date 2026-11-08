@@ -6,8 +6,13 @@ and reuse web pages.
 You run the server on a domain you control. The runner asks an AI service (OpenAI, Anthropic,
 xAI, Google, directly or through OpenRouter) a question about a fresh page on that server. The
 server log then shows which crawler downloaded the page, when, and with which headers. The
-answer shows what the model actually read. Each page carries codes that only the server can
-make, so a code in an answer proves the model saw that exact page.
+answer shows what the model actually read.
+
+Each test page shows five short codes, such as `TRUNC-13de1433e2ee`, at 0, 25, 50, 75 and 95% of
+the way down the page. The server works each code out from the page's address and a secret key
+that only you know. Nobody without the key can guess a code, and every page has different ones.
+So when an answer quotes a code, the model must have read that exact page, and the deepest code it
+quotes shows how far down the page it read.
 
 ## What it measures
 

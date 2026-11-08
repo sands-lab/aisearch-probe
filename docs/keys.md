@@ -5,8 +5,10 @@ You need either each vendor's own key, or one OpenRouter key. Both work for most
 ## Where keys go
 
 `probe-trial` reads a plain `KEY=value` file, by default `~/.config/probe-trial/env`
-(`-keyFile` picks another). Variables already set in your shell win over the file. The file
-is a good place for the two secrets as well:
+(`-keyFile` picks another). If a variable is already set in your shell, that value takes
+precedence over the one in the file. Besides the API keys, the file can also hold the page-code
+secret and the control password from [QUICKSTART.md](../QUICKSTART.md)
+(`PROBE_PAGE_CODE_SECRET`, `PROBE_CONTROL_SECRET`), so you don't have to type them for every run:
 
 ```
 OPENAI_API_KEY=...
@@ -36,11 +38,14 @@ Each route has a name. `-vendors` picks routes by name.
 A route can also be named with its model, e.g. `or:openai-gpt-5-mini`; the sharing test uses that
 to compare two models of one vendor.
 
-Through OpenRouter the fetch still runs on the vendor's own side (the server log shows
-`ChatGPT-User`, `Claude-User` and so on), so the cache being measured is the vendor's.
-`-checkVendors` confirms this from the log for each route. Not every OpenRouter model has a
-vendor-side fetch: for some, OpenRouter fetches with its own crawler instead, which turns the
-result into one about OpenRouter. Keep to the default models or check new ones first.
+> [!NOTE]
+> **OpenRouter routes.** Through OpenRouter the fetch still runs on the vendor's own side (the
+> server log shows `ChatGPT-User`, `Claude-User` and so on), so the cache being measured is the
+> vendor's. `-checkVendors` confirms this from the log for each route.
+>
+> Not every OpenRouter model has a vendor-side fetch: for some, OpenRouter fetches with its own
+> crawler instead, and the result is then about OpenRouter's cache, not the vendor's. Keep to the
+> default models, or run `-checkVendors` on a new one first.
 
 ## Which experiments need which keys
 

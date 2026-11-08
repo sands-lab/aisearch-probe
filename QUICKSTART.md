@@ -17,19 +17,25 @@ site owners, people who write crawler or caching policy.
 - **API keys**: either each vendor's own key, or one OpenRouter key. See [docs/keys.md](docs/keys.md).
 - **Two secrets** you make up yourself:
   - the page-code secret (`PROBE_PAGE_CODE_SECRET`). The server uses it to work out the short
-    codes it prints on each test page (e.g. `TRUNC-13de1433e2ee`). Without the secret nobody can
-    guess them. The runner uses the same secret to check which codes an answer quotes.
+    codes it prints on each test page (e.g. `TRUNC-13de1433e2ee`). The runner holds the same
+    secret, so it can work out the same codes and check which ones an answer quotes. The AI
+    service does not have the secret, so the only way its answer can contain a code is by
+    reading the page.
   - the control password (`PROBE_CONTROL_SECRET`). The runner uses it to change or fix pages on
     the server during the correction and heal tests.
 
 ## Build and test
 
 ```
-go build -o bin/probe-proxy ./proxy
-go build -o bin/probe-trial ./trial
+go build -o bin/probe-proxy ./proxy   # the server: serves the test pages and logs every request
+go build -o bin/probe-trial ./trial   # the runner (client): asks the AI services about the pages
+                                      #   and reads the server log to see who downloaded what
 go test ./...
 python3 -m pytest scripts -q
 ```
+
+The two programs can run on the same machine or on different ones. The runner needs the server's
+log file (see the setup pages).
 
 ## Set up the server
 

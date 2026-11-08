@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """TEST-FIRST spec for publicPageHomepage_score_table.py (robustness re-judging of the public-page staleness run).
-Run: python3 stale_consensus_test.py
+Run: python3 -m pytest publicPageHomepage_score_table_test.py
 """
 from publicPageHomepage_score_table import reference, mcnemar_p, outcome
 

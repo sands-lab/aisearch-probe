@@ -1,34 +1,42 @@
 #!/usr/bin/env bash
-# One lean n=3 round of the web_fetch dynamic-filtering study, meant for cron.
-#   Breadth anchor: the 8 object types at 8 KB (variance for the heatmap).
-#   Depth:          HTML at 32 and 64 KB (variance for the size-scaling curve;
-#                   128 KB is kept as the single dramatic n=1 point, not repeated).
-# DIRECT ONLY — no OpenRouter; the no-filtering baseline is already confirmed, so each
-# round is just filtering OFF (web_fetch_20250910) vs ON (web_fetch_20260209) on the
-# Anthropic direct key. Run from the worktree root (cron cd's here first). The three
-# rounds are fired at different times/dates so a load transient cannot fake the result.
-# Usage: dfbomb-round.sh <round-tag>    e.g. r2
+# One round of the Anthropic web_fetch dynamic-filtering test.
+#   Breadth: the 8 document types at 8 KB.
+#   Depth:   HTML at 32 and 64 KB.
+# Each page is asked twice: filtering OFF (web_fetch_20250910) and filtering ON
+# (web_fetch_20260209), on your own Anthropic key. Run three rounds at different
+# times or dates, so a passing load spike cannot fake the result, then pool them
+# with scripts/dynFilter_score.py.
+#
+# Usage: SITE_URL=https://<your server> scripts/dynFilter_run.sh <round-tag>   e.g. r1
+# Settings (environment):
+#   SITE_URL    your server's address (required)
+#   SERVER_LOG  your server's request log (default logs/probe.jsonl)
+#   BIN         the probe-trial binary (default ./bin/probe-trial)
+#   MODEL       the Anthropic model (default claude-sonnet-5)
+# probe-trial also needs PROBE_PAGE_CODE_SECRET and ANTHROPIC_API_KEY (or -keyFile).
+# Every vendor reply is kept whole in logs/dynFilter-<round-tag>-replies.jsonl.
 set -u
-TAG="${1:-rX}"
-BIN=./bin/probe-trial
-URL=https://probe.attentionhub.org
-PLOG=logs/probe.jsonl
-RAW="logs/dfbomb-round-${TAG}-raw.jsonl"
-OUT="logs/dfbomb-round-${TAG}.log"
-: > "$RAW"
+TAG="${1:?usage: dynFilter_run.sh <round-tag>}"
+: "${SITE_URL:?set SITE_URL to the address of your server, e.g. https://probe.example.org}"
+SERVER_LOG="${SERVER_LOG:-logs/probe.jsonl}"
+BIN="${BIN:-./bin/probe-trial}"
+MODEL="${MODEL:-claude-sonnet-5}"
+REPLIES="logs/dynFilter-${TAG}-replies.jsonl"
+OUT="logs/dynFilter-${TAG}.log"
+mkdir -p logs
 
-run() {  # <route> <sizes> <web_fetch_version>
-  "$BIN" -truncprobe -truncprobe-parta -truncprobe-route "$1" -truncprobe-sizes "$2" -truncprobe-reps 1 \
-    -only anthropic -anthropic-model claude-sonnet-5 \
-    -anthropic-fetch-version "$3" -anthropic-dump-raw "$RAW" \
-    -url "$URL" -probe-log "$PLOG" 2>&1 | grep -viE "loaded|skipping" | tee -a "$OUT"
+run() {  # <page kind> <sizes> <web_fetch version>
+  "$BIN" -readDepth-run -readDepth-page "$1" -readDepth-sizes "$2" -readDepth-repeats 1 \
+    -vendors anthropic -anthropicModel "$MODEL" -anthropicFetchTool "$3" \
+    -replyLog "$REPLIES" -siteUrl "$SITE_URL" -serverLog "$SERVER_LOG" 2>&1 \
+    | grep -viE "loaded|skipping" | tee -a "$OUT"
 }
 
-echo "=== dfbomb round $TAG started $(date -u) ===" | tee -a "$OUT"
+echo "=== dynamic-filtering round $TAG started $(date -u) ===" | tee -a "$OUT"
 for f in txt html md json xml csv pdf docx; do
-  echo "--- $f 8k A(no filter) ---" | tee -a "$OUT"; run "/depth${f}page/" 8k web_fetch_20250910
-  echo "--- $f 8k B(filter) ---"    | tee -a "$OUT"; run "/depth${f}page/" 8k web_fetch_20260209
+  echo "--- $f 8k, filtering off ---" | tee -a "$OUT"; run "/depth/$f/" 8k web_fetch_20250910
+  echo "--- $f 8k, filtering on ---"  | tee -a "$OUT"; run "/depth/$f/" 8k web_fetch_20260209
 done
-echo "--- html 32k,64k A(no filter) ---" | tee -a "$OUT"; run /depthhtmlpage/ 32k,64k web_fetch_20250910
-echo "--- html 32k,64k B(filter) ---"    | tee -a "$OUT"; run /depthhtmlpage/ 32k,64k web_fetch_20260209
-echo "=== dfbomb round $TAG done $(date -u) ===" | tee -a "$OUT"
+echo "--- html 32k,64k, filtering off ---" | tee -a "$OUT"; run /depth/html/ 32k,64k web_fetch_20250910
+echo "--- html 32k,64k, filtering on ---"  | tee -a "$OUT"; run /depth/html/ 32k,64k web_fetch_20260209
+echo "=== dynamic-filtering round $TAG done $(date -u) ===" | tee -a "$OUT"

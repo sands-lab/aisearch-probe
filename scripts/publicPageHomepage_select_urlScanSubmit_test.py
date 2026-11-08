@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for publicPageHomepage_select_urlScanSubmit.py. Run: python3 submit_scans_test.py
+"""TEST-FIRST spec for publicPageHomepage_select_urlScanSubmit.py. Run: python3 -m pytest publicPageHomepage_select_urlScanSubmit_test.py
 Covers: which sites still need a scan (a site is never submitted twice, even across restarts),
 reading the submit reply, and which submitted scans still need their report read.
 """

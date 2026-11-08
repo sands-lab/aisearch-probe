@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for publicPageHomepage_select_adultSites.py. Run: python3 family_dns_check_test.py
+"""TEST-FIRST spec for publicPageHomepage_select_adultSites.py. Run: python3 -m pytest publicPageHomepage_select_adultSites_test.py
 Cloudflare's 1.1.1.1 for Families (1.1.1.3) answers 0.0.0.0 for a domain it classes as malware or
 adult content. These tests pin how a DNS-over-HTTPS JSON reply becomes a verdict.
 """

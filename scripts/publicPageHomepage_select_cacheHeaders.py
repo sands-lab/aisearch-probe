@@ -5,7 +5,7 @@ sends the VALIDATORS a crawler would need to revalidate (ETag / Last-Modified). 
 the 'crawlers disregard declared Cache-Control' finding, and a realistic directive set to replicate
 in the controlled server.
 
-Pure logic (parse_cache_control / classify / asks_fresh) is unit-tested in survey_cache_headers_test.py.
+Pure logic (parse_cache_control / classify / asks_fresh) is unit-tested in publicPageHomepage_select_cacheHeaders_test.py.
 Usage: publicPageHomepage_select_cacheHeaders.py <origins.txt> <out.jsonl> [workers]
 """
 import sys, ssl, socket, json, time, urllib.request

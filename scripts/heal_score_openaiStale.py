@@ -1,22 +1,42 @@
-"""Numbers for doc/openai-stale-after-fetch-notes.md section 6 (run from the repo root:
-`python3 scripts/heal_score_openaiStale.py`) (heal test, OpenAI follow-ups).
-Rates: all 8 sittings. Reply-level measures: sittings with whole replies (s4, s5, b2, b3).
+"""Heal test, OpenAI follow-ups: how often OpenAI downloaded the fixed page but still answered
+with the failure, and what those replies look like. Read-only.
+
+Usage (from the repo root):
+  python3 scripts/heal_score_openaiStale.py --logs logs \
+      --group "Origin A=s1,s2" [--group "Origin B=b1,b2" ...] \
+      --server-log <host>=<server log> [--server-log ...] \
+      [--whole s1,b1] [--replies logs/raw-replies.jsonl]
+
+A sitting NAME means the files <logs>/heal-NAME.state.json (-heal-stateFile) and
+<logs>/heal-NAME.results.json (-heal-reportFile). --group labels a set of sittings for the rates.
+--server-log gives each server host's request log. --whole lists the sittings whose whole vendor
+replies were kept in --replies (default: every sitting named in a --group).
 Pages left out of the heal figure (first answer before our failure reached the vendor) and
-failed calls are skipped. Read-only."""
-import json, re, statistics
+failed calls are skipped."""
+import argparse, json, os, re, statistics
 from collections import Counter, defaultdict
 
 NOT_A_TEST = "no request reached us during the first ask"
-GROUPS = [("Origin A, old prompt", ["s1", "s2", "s3"]), ("Origin A, new prompt", ["s4", "s5"]),
-          ("Origin B, new prompt", ["b1", "b2", "b3"])]
-WHOLE = ["s4", "s5", "b2", "b3"]
-ORIGIN_LOG = {"probe.attentionhub.org": "logs/probe.jsonl", "agentfetchlab.com": "logs/probe-vps.jsonl"}
 TAG = re.compile(r"turn\d+\w*view\w*", re.I)
+# The healable page: /heal/ now, /healpage/ in older runs; OpenRouter OpenAI pages start "or".
+HEAL_OR = ("/heal/or", "/healpage/or")
+
+_ap = argparse.ArgumentParser(description="Heal test: OpenAI answers after it downloaded the fix.")
+_ap.add_argument("--logs", default="logs", help="folder holding heal-NAME.state.json and heal-NAME.results.json")
+_ap.add_argument("--group", action="append", required=True, metavar="LABEL=NAME,NAME")
+_ap.add_argument("--server-log", action="append", required=True, metavar="HOST=FILE")
+_ap.add_argument("--whole", default="", help="sittings with whole replies kept (default: all)")
+_ap.add_argument("--replies", default="logs/raw-replies.jsonl", help="the -replyLog file")
+_args = _ap.parse_args()
+GROUPS = [(lab, [x for x in names.split(",") if x])
+          for lab, _, names in (g.partition("=") for g in _args.group)]
+WHOLE = [x for x in _args.whole.split(",") if x] or [s for _, ss in GROUPS for s in ss]
+ORIGIN_LOG = dict(spec.split("=", 1) for spec in _args.server_log)
 
 
 def follow_ups(s):
-    st = json.load(open(f"logs/heal-{s}.state.json"))
-    res = json.load(open(f"logs/heal-{s}.results.json"))
+    st = json.load(open(os.path.join(_args.logs, f"heal-{s}.state.json")))
+    res = json.load(open(os.path.join(_args.logs, f"heal-{s}.results.json")))
     for pg in st["pages"]:
         if pg["provider"] != "or:openai":
             continue
@@ -44,15 +64,15 @@ for name, ss in GROUPS:
 
 # reply-level
 raw = defaultdict(list)
-for line in open("logs/raw-replies.jsonl"):
+for line in open(_args.replies):
     r = json.loads(line)
-    if "healpage/or" in r["url"] and "openai" in r["url"] and r.get("raw"):
+    if any(k in r["url"] for k in HEAL_OR) and "openai" in r["url"] and r.get("raw"):
         raw[r["url"]].append(r)
 logs = {}
 for host, path in ORIGIN_LOG.items():
     d = defaultdict(list)
     for line in open(path):
-        if "/healpage/or" not in line or "openai" not in line:
+        if not any(k in line for k in HEAL_OR) or "openai" not in line:
             continue
         x = json.loads(line)
         if x["bot"].startswith("probe-"):
@@ -93,7 +113,7 @@ def rng(v):
     return f"{min(v):,.0f}-{max(v):,.0f} (median {statistics.median(v):,.0f})" if max(v) > 50 else f"{min(v):.1f}-{max(v):.1f} (median {statistics.median(v):.1f})"
 
 
-print("\n== Reply-level (s4, s5, b2, b3)")
+print(f"\n== Reply-level ({', '.join(WHOLE)})")
 for kind in ["stale", "none", "fresh"]:
     d = m[kind]
     n = len(d["duration"])

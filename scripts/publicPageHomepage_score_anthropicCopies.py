@@ -36,7 +36,7 @@ ROLE_NAME = {"warmup": "warm-up (0:00, normal address)", "plain": "normal addres
 
 def _t(s): return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
-# ---- pure logic (tested in anthropic_copies_test.py) ----
+# ---- pure logic (tested in publicPageHomepage_score_anthropicCopies_test.py) ----
 def age_group(minutes):
     if minutes is None: return "no copy"
     if minutes < 2: return "fresh (under 2 min)"

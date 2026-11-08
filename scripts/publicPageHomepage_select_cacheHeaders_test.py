@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for the cache-header survey's pure logic. Run: python3 survey_cache_headers_test.py
+"""TEST-FIRST spec for the cache-header survey's pure logic. Run: python3 -m pytest publicPageHomepage_select_cacheHeaders_test.py
 Covers parsing a Cache-Control header into directives and classifying the site's caching stance.
 """
 from publicPageHomepage_select_cacheHeaders import parse_cache_control, classify, asks_fresh

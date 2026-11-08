@@ -12,7 +12,7 @@ any label is on the paper's list (EXCLUDE). The scanned page's address is never 
 Gentle by design: one request at a time, 1 per 12 s (documented free-plan limit 1 per 10 s, plus margin), and the run STOPS at the first 429.
 Env: CLOUDFLARE_API_TOKEN (URL Scanner Read), CLOUDFLARE_ACCOUNT_ID
 Usage: publicPageHomepage_select_urlScanSearch.py <sites.txt> <out.jsonl> [days=30, max 30]
-Pure logic is unit-tested in search_public_scans_test.py.
+Pure logic is unit-tested in publicPageHomepage_select_urlScanSearch_test.py.
 """
 import sys, os, json, time, urllib.request, urllib.parse
 from urllib.error import HTTPError

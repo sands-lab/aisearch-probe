@@ -3,7 +3,7 @@
 data), checking it on the live page just before asking, the approved question — the first 12 WORDS
 after the anchor (no line counting: each service splits pages into lines differently; 12 words is
 under OpenAI's ~25-word quote limit and light for Google's RECITATION filter) — and scoring.
-Run: python3 anchor_check_test.py
+Run: python3 -m pytest publicPageHomepage_select_anchor_test.py
 """
 from publicPageHomepage_select_anchor import (pick_anchor, question, tagged, live_gate, is_label, words_after, spaceless,
                           score_follow)
@@ -89,9 +89,10 @@ def test_score_spaceless_page_by_characters():
 
 def test_remote_snap_command_takes_contact_from_env_only():
     from publicPageHomepage_select_anchor import remote_snap_cmd, ask_id
-    cmd = remote_snap_cmd("https://hvg.hu", contact="someone@example.org")
-    assert cmd[:3] == ["ssh", "-o", "BatchMode=yes"] and "probe-vps" in cmd
-    assert "publicPageHomepage_select_anchor.py snap1 https://hvg.hu" in cmd[-1] and "PROBE_CONTACT=someone@example.org" in cmd[-1]
+    cmd = remote_snap_cmd("https://hvg.hu", contact="contact-x", host="snaphost", folder="dl/scripts")
+    assert cmd[:3] == ["ssh", "-o", "BatchMode=yes"] and "snaphost" in cmd
+    assert cmd[-1].startswith("cd dl/scripts && ")
+    assert "publicPageHomepage_select_anchor.py snap1 https://hvg.hu" in cmd[-1] and "PROBE_CONTACT=contact-x" in cmd[-1]
     # a page's answers and its two copies share one id
     assert ask_id("https://hvg.hu", "2026-10-28T15:00:00Z") == "https://hvg.hu@2026-10-28T15:00:00Z"
 

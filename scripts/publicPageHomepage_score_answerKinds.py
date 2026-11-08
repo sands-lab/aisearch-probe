@@ -18,7 +18,7 @@ Deviation from the drafted scheme, on purpose: a valid read is checked BEFORE re
 because answers mix them (OpenAI, carview: "I can't provide the exact verbatim lines" + an excerpt).
 Nothing is removed from pages or answers before matching. Pages without spaces (Japanese, Chinese)
 use characters: runs of >= MIN_CHARS within the first EXT_CHARS after the anchor.
-Pure logic is unit-tested in classify_answers_test.py.
+Pure logic is unit-tested in publicPageHomepage_score_answerKinds_test.py.
 Usage: publicPageHomepage_score_answerKinds.py <answers.jsonl> <copies.jsonl> [--min-run 5 --near 20 --ext 60]
 """
 import sys, os, re, json, difflib, subprocess, collections

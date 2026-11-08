@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for publicPageHomepage_poll.py (the change watch). Run: python3 watch_pages_test.py
+"""TEST-FIRST spec for publicPageHomepage_poll.py (the change watch). Run: python3 -m pytest publicPageHomepage_poll_test.py
 Covers: splitting sites into day-groups, evenly spaced slots inside the 10-minute cycle,
 visible text as LINES (for spotting which lines changed), the per-site back-off after a
 "slow down" answer, and the snapshot naming that stores each distinct page text once.

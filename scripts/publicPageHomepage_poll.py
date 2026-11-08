@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Change watch for the public-page validation (doc/public_page_validation_notes.md 4.5).
+"""Change watch for the public-page validation (method: docs/experiments/publicPage.md).
 Downloads each site's homepage once every 10 minutes for 24 hours, to learn which pages change
 often enough (within the 20-minute wait of the AI test) to be useful. No AI calls.
 
@@ -14,7 +14,7 @@ Modest by design:
 - a file named STOP in the output folder ends the run cleanly.
 
 Each distinct page text is stored once (gzip, per site) and every visit logs its fingerprint.
-Pure logic is unit-tested in watch_pages_test.py.
+Pure logic is unit-tested in publicPageHomepage_poll_test.py.
 Usage: PROBE_CONTACT=... publicPageHomepage_poll.py <sites.txt> <out-dir> [--groups 2] [--hours 24]
                                       [--cycle 600] [--first-group 0]
 """

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for publicPageXmlFile_run.py (public XML file-type test). Run: python3 file_test_test.py
+"""TEST-FIRST spec for publicPageXmlFile_run.py (public XML file-type test). Run: python3 -m pytest publicPageXmlFile_run_test.py
 Covers picking the test files, the question, lane timing (offsets, 3-minute spacing, Google's pause
 window), and scoring an answer against the answer key.
 """

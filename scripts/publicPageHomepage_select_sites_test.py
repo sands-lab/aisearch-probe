@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for the public-page day-0 scan's pure logic. Run: python3 day0_scan_test.py
+"""TEST-FIRST spec for the public-page day-0 scan's pure logic. Run: python3 -m pytest publicPageHomepage_select_sites_test.py
 Covers: picking the site list, the contact name tag, failure types, block-page signs, the
 shell-page flag, visible text, and robots.txt matching per RFC 9309.
 """
@@ -28,8 +28,8 @@ def test_name_tag_needs_contact():
     try:
         name_tag({"PROBE_CONTACT": "  "}); assert False, "blank contact must be refused"
     except SystemExit: pass
-    t = name_tag({"PROBE_CONTACT": "someone@example.org"})
-    assert "someone@example.org" in t and t.startswith("research-cache-probe/")
+    t = name_tag({"PROBE_CONTACT": "contact-x"})
+    assert "contact-x" in t and t.startswith("research-cache-probe/")
 
 def test_failure_type():
     U = urllib.error.URLError
@@ -52,7 +52,7 @@ def test_block_sign():
     assert block_sign(403, {"cf-mitigated": "challenge"}, "") == "cloudflare"
     assert block_sign(403, {"Server": "AkamaiGHost"}, "Access Denied ... Reference #18.abc") == "akamai"
     assert block_sign(200, {}, "please complete the captcha to continue") == "captcha"
-    # a network filter (e.g. a firewall's block page) is what a KAUST-side block would look like
+    # a network filter (e.g. a firewall's block page) is what a block on your own network would look like
     assert block_sign(200, {}, "FortiGuard Intrusion Prevention - Access Blocked") == "network-filter"
     assert block_sign(403, {}, "<h1>Web Page Blocked</h1>") == "network-filter"
     # a plain 403 with no recognisable page is recorded by status only

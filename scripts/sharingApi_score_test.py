@@ -6,28 +6,28 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sharingApi_score as g  # noqa: E402
 
-U = "https://agentfetchlab.com/depthhtmlpage/sh-run1-ob/2048"
+U = "https://probe.example.org/depth/html/sh-run1-ob/2048"
 
 
-def rec(t, path, ua="Mozilla/5.0 ChatGPT-User", bot="openai-query", host="agentfetchlab.com"):
+def rec(t, path, ua="Mozilla/5.0 ChatGPT-User", bot="openai-query", host="probe.example.org"):
     return {"ts_unix": t, "page_key": path, "url": f"https://{host}{path}",
             "user_agent": ua, "bot": bot, "ts": "2026-10-28T00:00:00Z", "status_code": 200}
 
 
 class Grade(unittest.TestCase):
     def test_same_page_counts_every_size_not_the_control(self):
-        self.assertTrue(g.same_page("/depthhtmlpage/sh-run1-ob/2048", U))
-        self.assertTrue(g.same_page("/depthhtmlpage/sh-run1-ob/4096", U))
-        self.assertTrue(g.same_page("/depthhtmlpage/sh-run1-ob", U))
-        self.assertFalse(g.same_page("/depthhtmlpage/sh-run1-ob-ctl/2048", U))
+        self.assertTrue(g.same_page("/depth/html/sh-run1-ob/2048", U))
+        self.assertTrue(g.same_page("/depth/html/sh-run1-ob/4096", U))
+        self.assertTrue(g.same_page("/depth/html/sh-run1-ob", U))
+        self.assertFalse(g.same_page("/depth/html/sh-run1-ob-ctl/2048", U))
 
     def test_window_own_probes_and_other_host(self):
         recs = [
-            rec(99, "/depthhtmlpage/sh-run1-ob/2048"),                 # before sending
-            rec(110, "/depthhtmlpage/sh-run1-ob/2048"),                # counts
-            rec(120, "/depthhtmlpage/sh-run1-ob/2048", ua="probe-liveness/1", bot="probe-liveness"),
-            rec(130, "/depthhtmlpage/sh-run1-ob/2048", host="probe.attentionhub.org"),
-            rec(100 + g.SENT_WINDOW + 1, "/depthhtmlpage/sh-run1-ob/2048"),  # too late
+            rec(99, "/depth/html/sh-run1-ob/2048"),                 # before sending
+            rec(110, "/depth/html/sh-run1-ob/2048"),                # counts
+            rec(120, "/depth/html/sh-run1-ob/2048", ua="probe-liveness/1", bot="probe-liveness"),
+            rec(130, "/depth/html/sh-run1-ob/2048", host="other.example.net"),
+            rec(100 + g.SENT_WINDOW + 1, "/depth/html/sh-run1-ob/2048"),  # too late
         ]
         self.assertEqual(len(g.downloads(recs, U, 100)), 1)
 

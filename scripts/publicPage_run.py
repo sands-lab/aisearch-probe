@@ -61,7 +61,7 @@ def _post(url, headers, body, retries=5, timeout=None, retry_on_timeout=True, at
 
 # ---- each provider's OWN report of what happened to the fetch (tested) ----
 # Record these on every call, next to the answer and tokens: without them a refusal like Gemini's
-# bare "I cannot read the document" cannot be explained (see anchor_probe_test.py).
+# bare "I cannot read the document" cannot be explained (see publicPage_run_test.py).
 def gemini_fetch_status(r):
     cand = ((r or {}).get("candidates") or [{}])[0]
     return [{"url": m.get("retrievedUrl"), "status": m.get("urlRetrievalStatus")}
@@ -90,7 +90,7 @@ def openrouter_fetch_status(r):
 
 def anthropic_fetched_texts(content):
     """The full text Anthropic's web_fetch handed the model, with its retrieval time — the one
-    provider whose response includes the fetched page (PROVIDERS.md, 2026-10-28)."""
+    provider whose response includes the fetched page."""
     out = []
     for b in content or []:
         c = (b.get("content") or {}) if b.get("type") == "web_fetch_tool_result" else {}

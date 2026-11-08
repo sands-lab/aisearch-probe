@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests for publicPageEndpoint_run.py — no network, no keys. Monkeypatches the vendor callers and checks
 the schedule, the per-vendor anchor split, the record shape (Anthropic self-dating), the cost
-estimate, and the Anthropic spend cap. Run: python3 anchor_lifetime_test.py"""
+estimate, and the Anthropic spend cap. Run: python3 -m pytest publicPageEndpoint_run_test.py"""
 import os, sys, json, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import publicPage_run as ap

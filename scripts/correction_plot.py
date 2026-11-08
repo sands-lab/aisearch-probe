@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot the correction-visibility runs (doc/correction-visibility-method.md).
+"""Plot the correction-visibility runs (method: docs/experiments/correction.md).
 
 Two figures, each saved as PNG and PDF:
   correction-timeline   one panel per origin; one mark per follow-up query, placed at
@@ -13,13 +13,15 @@ Two figures, each saved as PNG and PDF:
 Outcomes are computed here from the runner's state files and the ORIGIN'S OWN log, with
 the same rules as `probe-trial -correction-report`: only requests that arrived between
 sending the question and the answer coming back count, and the version a request got is
-read from the fingerprint tag we sent. Origin A's log is logs/probe.jsonl; origin B's is
-logs/probe-vps.jsonl (a copy of the VPS log; read after the run, so its lag cannot matter).
+read from the fingerprint tag we sent. Read each server's log after its runs have ended.
 
-Usage: correction_plot.py --logs <dir with the logs and correction-*.state.json>
-                          --out <figure dir> A:s1:old A:s2:old ... B:vps2:new
-Each run is ORIGIN:RUN:PROMPT; ORIGIN is A or B, PROMPT is old (wrapper) or new
-(address + question only).
+Usage: correction_plot.py --logs <dir with correction-<RUN>.state.json>
+                          --origin A=<server log>[=<panel title>] [--origin B=...]
+                          --out <figure dir> A:<run>:old A:<run>:new ...
+Each --origin names one server (a short label, its request log, and an optional title).
+Each run is ORIGIN:RUN:PROMPT: ORIGIN is one of the --origin labels, RUN names the state file
+correction-<RUN>.state.json (write it with -correction-stateFile), and PROMPT is old (wrapper) or
+new (address + question only).
 """
 import argparse
 import json
@@ -37,8 +39,9 @@ from matplotlib.lines import Line2D  # noqa: E402
 BLUE, ORANGE = "#2a78d6", "#eb6834"
 INK, INK2, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#8a8984", "#e6e5e0", "#fcfcfb"
 
-ORIGIN_LOG = {"A": "probe.jsonl", "B": "probe-vps.jsonl"}
-ORIGIN_NAME = {"A": "Origin A (behind Cloudflare)", "B": "Origin B (direct, no CDN)"}
+# Filled from --origin: label -> request log path, label -> panel title.
+ORIGIN_LOG = {}
+ORIGIN_NAME = {}
 PROMPT_NAME = {"old": "old prompt", "new": "new prompt"}
 
 ROWS = [("or:openai", "html", "OpenAI (HTML)"), ("or:openai", "txt", "OpenAI (txt)"),
@@ -59,7 +62,7 @@ STYLE = {
 def parse_run(spec):
     origin, run, prompt = spec.split(":")
     if origin not in ORIGIN_LOG or prompt not in PROMPT_NAME:
-        raise SystemExit(f"bad run {spec!r}: want A|B:<run>:old|new")
+        raise SystemExit(f"bad run {spec!r}: want <origin label>:<run>:old|new, origin one of {sorted(ORIGIN_LOG)}")
     return dict(origin=origin, run=run, prompt=prompt)
 
 
@@ -67,7 +70,8 @@ def load_fetches(log_path, paths):
     out = defaultdict(list)
     with open(log_path) as f:
         for line in f:
-            if "/verhtmlpage/" not in line and "/vertxtpage/" not in line:
+            # /correction/html|txt/ now; /verhtmlpage/, /vertxtpage/ in older runs
+            if not any(k in line for k in ("/correction/html/", "/correction/txt/", "/verhtmlpage/", "/vertxtpage/")):
                 continue
             try:
                 r = json.loads(line)
@@ -80,13 +84,13 @@ def load_fetches(log_path, paths):
 
 def outcomes(log_dir, runs):
     rows = []
-    for origin in ("A", "B"):
+    for origin in ORIGIN_LOG:
         mine = [r for r in runs if r["origin"] == origin]
         if not mine:
             continue
         states = {r["run"]: json.load(open(os.path.join(log_dir, f"correction-{r['run']}.state.json"))) for r in mine}
         paths = {p["path"] for st in states.values() for p in st["pages"]}
-        fetches = load_fetches(os.path.join(log_dir, ORIGIN_LOG[origin]), paths)
+        fetches = load_fetches(ORIGIN_LOG[origin], paths)
         for run in mine:
             for p in states[run["run"]]["pages"]:
                 if p["status"] == "void":
@@ -133,7 +137,7 @@ def legend_handles(kinds):
 
 
 def plot_timeline(rows, runs, out):
-    origins = [o for o in ("A", "B") if any(r["origin"] == o for r in runs)]
+    origins = [o for o in ORIGIN_LOG if any(r["origin"] == o for r in runs)]
     fig, axes = plt.subplots(1, len(origins), figsize=(7.2 * len(origins), 5.8), sharey=True, squeeze=False)
     fig.patch.set_facecolor(SURFACE)
     y_of = {(v, f): len(ROWS) - 1 - i for i, (v, f, _) in enumerate(ROWS)}
@@ -173,7 +177,7 @@ def plot_timeline(rows, runs, out):
 
 def plot_fetched_but_old(rows, runs, out):
     groups = []
-    for origin in ("A", "B"):
+    for origin in ORIGIN_LOG:
         for prompt in ("old", "new"):
             names = [r["run"] for r in runs if r["origin"] == origin and r["prompt"] == prompt]
             if names:
@@ -222,10 +226,18 @@ def plot_fetched_but_old(rows, runs, out):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--logs", required=True)
+    ap.add_argument("--logs", required=True, help="folder holding correction-<RUN>.state.json")
+    ap.add_argument("--origin", action="append", required=True,
+                    help="LABEL=SERVER_LOG[=TITLE], e.g. A=logs/probe.jsonl='Origin A (behind a CDN)'")
     ap.add_argument("--out", required=True)
-    ap.add_argument("runs", nargs="+", help="ORIGIN:RUN:PROMPT, e.g. A:s1:old B:vps2:new")
+    ap.add_argument("runs", nargs="+", help="ORIGIN:RUN:PROMPT, e.g. A:s1:old B:d1:new")
     args = ap.parse_args()
+    for spec in args.origin:
+        parts = spec.split("=", 2)
+        if len(parts) < 2:
+            raise SystemExit(f"bad --origin {spec!r}: want LABEL=SERVER_LOG[=TITLE]")
+        ORIGIN_LOG[parts[0]] = parts[1]
+        ORIGIN_NAME[parts[0]] = parts[2] if len(parts) > 2 else f"Origin {parts[0]}"
     runs = [parse_run(s) for s in args.runs]
     rows = outcomes(args.logs, runs)
     plot_timeline(rows, runs, args.out)

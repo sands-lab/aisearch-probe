@@ -64,7 +64,7 @@ from publicPageHomepage_select_anchor import _tokens, spaceless
 VENDORS = ["anthropic", "openai", "xai", "google"]
 RULES = ["download only", "consensus", "consensus without our download"]
 
-# ---- pure logic (tested in stale_consensus_test.py) ----
+# ---- pure logic (tested in publicPageHomepage_score_table_test.py) ----
 def reference(sources, agree):
     """-> ("ok", set of sources) | ("no reference", None) | ("tie", None)"""
     for k in range(len(sources), 1, -1):

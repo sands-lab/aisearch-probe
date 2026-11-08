@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Pool the three time-spread rounds of the dynamic-filtering study and report mean +/- spread
-per cell. Rounds: 2026-10-15 (round 1 breadth 2/4/8/16k + depth 32/64/128k), 2026-10-16 (r2),
-2026-10-17 (r3). Direct only; cell = A (web_fetch_20250910, filtering off) or B
-(web_fetch_20260209, filtering on). n=3 cells: all types at 8KB, and HTML 32/64KB."""
-import json, glob, re, statistics as st
+"""Pool the time-spread rounds of the dynamic-filtering test (dynFilter_run.sh) and report mean
++/- spread per cell. Anthropic direct only; cell = A (web_fetch_20250910, filtering off) or B
+(web_fetch_20260209, filtering on). Each round gives all types at 8 KB and HTML at 32/64 KB.
+Usage: dynFilter_score.py [result files ...]   (default logs/results/truncprobe-run*.jsonl)"""
+import json, glob, re, sys, statistics as st
+
+# Depth page addresses: the current /depth/<fmt>/ and the older /depth<fmt>page/.
+PAGE_RE = re.compile(r"/depth(?:/([A-Za-z]+)/|([a-z]+)page/)")
+
+def page_fmt(url):
+    m = PAGE_RE.search(url or "")
+    return (m.group(1) or m.group(2)) if m else None
 
 def cell(v, w):
     if v != "anthropic":
@@ -11,16 +18,18 @@ def cell(v, w):
     return "A" if w == "web_fetch_20250910" else "B" if w == "web_fetch_20260209" else None
 
 pool = {}
-for f in sorted(glob.glob("logs/results/truncprobe-run*.jsonl")):
+if any(a in ("-h", "--help") for a in sys.argv[1:]):
+    sys.exit(__doc__)
+for f in sorted(sys.argv[1:] or glob.glob("logs/results/truncprobe-run*.jsonl")):
     for line in open(f):
         r = json.loads(line); ex = r.get("extra", {})
         if ex.get("part") != "A":
             continue
-        m = re.search(r"/depth([a-z]+)page/", r.get("url", ""))
+        fmt = page_fmt(r.get("url", ""))
         c = cell(r.get("vendor", ""), ex.get("web_fetch_version", ""))
         it = r.get("input_tokens")
-        if m and c and it:
-            pool.setdefault((m.group(1), ex.get("size_bytes"), c), []).append(it)
+        if fmt and c and it:
+            pool.setdefault((fmt, ex.get("size_bytes"), c), []).append(it)
 
 def fmt_stat(xs):
     if len(xs) == 1:

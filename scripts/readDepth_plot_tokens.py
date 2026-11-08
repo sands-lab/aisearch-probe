@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Clean 3-vendor read-window plot: input tokens (page content fed to the model) vs
-page size. One mean line per vendor. Data is POOLED across the clean /depthhtmlpage/
-runs on 6-7 Oct (n up to 3 per size), Part-A scans only.
+"""3-vendor read-window plot: input tokens (page content fed to the model) vs page size.
+One mean line per vendor, pooled across the HTML read-depth runs given (n up to 3 per size).
 
-The story (FINDINGS Result 23, supersedes Result 16):
+Usage: readDepth_plot_tokens.py <out path without extension> [--log] [result files ...]
+       (default files: logs/results/truncprobe-run*.jsonl; --log draws a log y axis)
+
+What the runs showed:
   - OpenAI  — SUMMARIZES: reads the whole page but caps input ~65k (cheap, complete).
   - Anthropic — INGESTS: input rises ~1:1 with size (linear, expensive, no cap to 2 MB).
   - xAI — TRUNCATES at a fixed ~500 KB window: flat input, and read depth falls past it
           (1 MB -> 50%, 2 MB -> 25%).
 """
-import json, collections, sys, glob
+import argparse, json, collections, sys, glob
 
 import matplotlib
 matplotlib.use("Agg")
@@ -23,13 +25,23 @@ VENDORS = {
     "or:x-ai":      ("xAI  Grok-4.3",              "#5b6ee1", "^"),
 }
 
+_ap = argparse.ArgumentParser(description="Draw input tokens against page size.")
+_ap.add_argument("out", nargs="?", default="readwindow", help="output path without extension")
+_ap.add_argument("--log", action="store_true", help="log y axis")
+_ap.add_argument("files", nargs="*", help="result files (default logs/results/truncprobe-run*.jsonl)")
+ARGS = _ap.parse_args()
+
+def is_html_depth(url):
+    """The HTML depth page: /depth/html/ now, /depthhtmlpage/ in older runs."""
+    return "/depth/html/" in url or "/depthhtmlpage/" in url
+
 def pooled_mean_by_size():
-    """Pool every clean html Part-A scan (6-7 Oct) -> {vendor: {size: mean_input}}."""
+    """Pool every html scan -> {vendor: {size: mean_input}}."""
     acc = collections.defaultdict(lambda: collections.defaultdict(list))
-    for path in glob.glob("logs/results/truncprobe-run2026100[67]-*.jsonl"):
+    for path in ARGS.files or glob.glob("logs/results/truncprobe-run*.jsonl"):
         for line in open(path):
             r = json.loads(line); ex = r.get("extra", {})
-            if ex.get("part") != "A" or "/depthhtmlpage/" not in r.get("url", ""):
+            if ex.get("part") != "A" or not is_html_depth(r.get("url", "")):
                 continue
             it, sz, v = r.get("input_tokens"), ex.get("size_bytes"), r.get("vendor", "")
             if it and sz and v in VENDORS:
@@ -45,7 +57,7 @@ for v, (label, color, marker) in VENDORS.items():
         ax.plot([], [], color=color, marker=marker, label=label + "  (pending)", lw=2)
         continue
     xs = sorted(d)
-    ys = [d[x] / 1000.0 for x in xs]  # thousands of tokens
+    ys = [d[x] / 1000.0 for x in xs]  # in units of 1,000 tokens
     ax.plot(xs, ys, color=color, marker=marker, ms=7, lw=2.2, label=label)
 
 # The only measured read CUT in range: xAI stops reading past ~500 KB (read depth falls).
@@ -73,11 +85,11 @@ ax.legend(frameon=False, loc="upper left")
 ax.margins(y=0.12)
 fig.tight_layout()
 
-if len(sys.argv) > 2 and sys.argv[2] == "log":
+if ARGS.log:
     ax.set_yscale("log")
 
-out = sys.argv[1] if len(sys.argv) > 1 else "readwindow"
-for ext in ("png", "svg", "pdf"):  # PDF too, per the paper-figures policy
+out = ARGS.out
+for ext in ("png", "svg", "pdf"):
     fig.savefig(out + "." + ext, bbox_inches="tight")
 print("wrote", out, "(.png/.svg/.pdf)")
 for v, (label, _, _) in VENDORS.items():

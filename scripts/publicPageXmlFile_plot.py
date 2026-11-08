@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Compact versions of the public XML file test figure, for the paper (spec from 2026-10-28):
+"""Compact versions of the public XML file test figure, for the paper:
   grid     rows = declared file type, columns = service, each spot a small 100% bar
   heatmap  two small heatmaps, Refused % and Read %, one shared colour scale
 Four outcomes only, each a plain sum of the scored outcomes in publicPageXmlFile_run.score:
   Read = read; Partial = header lines only + fetched as one line; Refused = refused;
   Other = inconclusive + failed.
-RSS and the single Atom file share one row ("RSS or Atom"). Same scoring and answer keys as
-plot-public-filetest.py; nothing in the data changes. Paper style: 7 pt text, fonts embedded,
+RSS and the single Atom file share one row ("RSS or Atom"). Paper style: 7 pt text, fonts embedded,
 service order Anthropic, OpenAI, xAI, then Google; outcome colours are the paper's good (blue) /
 bad (red) family and never a service hue.
 Saves PDF + PNG.
@@ -143,4 +142,6 @@ def main():
         print(name, {t: {k: round(x, 1) for k, x in s[(v, t)][0].items()} for t, _ in TYPES})
     grid(s, sys.argv[3]); heatmap(s, sys.argv[3])
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    if len(sys.argv) != 4 or sys.argv[1] in ("-h", "--help"): sys.exit(__doc__)
+    main()

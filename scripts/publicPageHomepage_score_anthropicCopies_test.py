@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TEST-FIRST spec for publicPageHomepage_score_anthropicCopies.py: staleness from the copy Anthropic actually fetched (its saved
 page text and its own retrieved_at), not from how it worded the answer.
-Run: python3 anthropic_copies_test.py
+Run: python3 -m pytest publicPageHomepage_score_anthropicCopies_test.py
 """
 from publicPageHomepage_score_anthropicCopies import age_group, reuse, share, fetch_error
 

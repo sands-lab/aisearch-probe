@@ -7,10 +7,12 @@ Per-position presence is reconstructed properly: each stored answer is matched a
 that page's OWN five ordered markers (re-fetched by id), not assumed contiguous. Cell
 shade = fraction of trials (0..1) that returned that position's code.
 
-Data: clean /depthhtmlpage/ Part-A scans, pooled 5-7 Oct (n up to 3 per size).
-Usage: python3 scripts/readDepth_plot_markers.py doc/figures/read-depth-grid
+Data: the HTML read-depth scans given (n up to 3 per size). Each page is downloaded again from your
+server to learn its five codes, so the server must still be up and serve the same pages.
+Usage: python3 scripts/readDepth_plot_markers.py <out path without extension> [result files ...]
+       (default files: logs/results/truncprobe-run*.jsonl)
 """
-import json, glob, collections, subprocess, re, sys
+import argparse, json, glob, collections, subprocess, re, sys
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -25,12 +27,18 @@ SIZES = [4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 20971
 def size_label(s):
     return f"{s // 1024}k" if s < 1 << 20 else f"{s // (1 << 20)}M"
 
-# Collect clean html Part-A records.
+_ap = argparse.ArgumentParser(description="Draw which depth codes each vendor returned.")
+_ap.add_argument("out", nargs="?", default="read-depth-grid", help="output path without extension")
+_ap.add_argument("files", nargs="*", help="result files (default logs/results/truncprobe-run*.jsonl)")
+ARGS = _ap.parse_args()
+
+# Collect the HTML scans (/depth/html/ now, /depthhtmlpage/ in older runs).
 recs = []
-for f in glob.glob("logs/results/truncprobe-run2026100[567]-*.jsonl"):
+for f in ARGS.files or glob.glob("logs/results/truncprobe-run*.jsonl"):
     for line in open(f):
         r = json.loads(line); ex = r.get("extra", {})
-        if ex.get("part") != "A" or "/depthhtmlpage/" not in r.get("url", ""):
+        u = r.get("url", "")
+        if ex.get("part") != "A" or ("/depth/html/" not in u and "/depthhtmlpage/" not in u):
             continue
         recs.append((r.get("vendor", ""), ex.get("size_bytes"),
                      r.get("url", ""), r.get("answer_text") or ""))
@@ -92,7 +100,7 @@ fig.legend(handles=[Patch(facecolor=RETURNED, edgecolor="#cccccc", label="return
                     Patch(facecolor=ABSENT, edgecolor="#cccccc", label="not returned")],
            loc="lower center", ncol=2, frameon=False, bbox_to_anchor=(0.5, -0.02))
 
-out = sys.argv[1] if len(sys.argv) > 1 else "read-depth-grid"
+out = ARGS.out
 for ext in ("png", "svg", "pdf"):
     fig.savefig(out + "." + ext, bbox_inches="tight")
 print("wrote", out, "(.png/.svg/.pdf)")

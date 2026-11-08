@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Find public XML, Markdown and CSV files published by the watched sites, for the file-type check
-(doc/public_page_validation_notes.md section 3). Looks only in the standard places sites announce
+(method: docs/experiments/publicPage.md). Looks only in the standard places sites announce
 files — no crawling:
   XML       Sitemap: lines in robots.txt (else /sitemap.xml); RSS/Atom <link rel=alternate> on the homepage
   Markdown  /llms.txt
@@ -11,7 +11,7 @@ bill all of it). Each file is checked against ITS OWN host's robots.txt, for our
 4 AI fetchers. At most ~5 requests per site, once; 4 sites at a time; honest name tag
 ($PROBE_CONTACT, never in code). The first 20 text lines of each kept file are stored as the
 answer key for the later AI question.
-Pure logic is unit-tested in find_files_test.py.
+Pure logic is unit-tested in publicPageXmlFile_select_test.py.
 Usage: PROBE_CONTACT=... publicPageXmlFile_select.py <sites.txt> <out-dir> [per_format=20]
 """
 import sys, os, re, json, time, random, threading, urllib.request, urllib.parse

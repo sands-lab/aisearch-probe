@@ -1,25 +1,31 @@
 #!/usr/bin/env python3
 """Fault token cost: a failed fetch costs the caller nearly as much input as a
-successful one (FINDINGS Result 26). One single-column ACM sigconf panel.
+successful one. One single-column ACM sigconf panel.
 
-    python3 scripts/fault_plot.py --logs <repo>/logs --out doc/figures
+    python3 scripts/fault_plot.py --logs logs --out figures \
+        --runs A=<run>,<run>,<run> [--runs B=<run>,...] \
+        --baseline A=<fault-outFile of the flaky/0 run> [--baseline B=...]
 
-Reads only raw per-call records (logs/results/faults-<run>.jsonl, input_tokens) and
-the bespoke fault files (to pick the successful baseline calls). Every plotted number
-is a median over raw calls, pooled across Origin A and Origin B; nothing is smoothed.
+--runs gives, per server (A, B), the fault run ids (the run id each `probe-trial -fault-run`
+prints; its records are logs/results/faults-<run>.jsonl). --baseline gives, per server, the
+-fault-outFile written by the success-baseline run (`-fault-kinds flaky/0`); its records pick
+the successful calls. One server is enough; with two, numbers are pooled across them.
+--check-paper compares the per-server medians with the table in the paper.
+
+Reads only raw per-call records (logs/results/faults-<run>.jsonl, input_tokens) and the
+baseline files. Every plotted number is a median over raw calls; nothing is smoothed.
 
 Writes:
   <out>/fault-token-cost.pdf   the figure, exactly 3.33 x 2.1 in (no tight crop)
   <out>/fault-token-cost.png   a preview
   <out>/fault-token-cost.csv   every plotted number: pooled, Origin A and B medians, counts
-and prints the checks: recomputed medians vs the agreed table, cells where the two
+and prints the checks: (with --check-paper) recomputed medians vs the paper's table, cells where the two
 origins differ by more than 25% of the pooled median, the PDF page size, and the
 questions behind the success and fault calls.
 
-Vendor colours are copied from the shared paper style (branch
-worktree-figure-style-rules, scripts/paper/style.py, VENDOR; Anthropic = the "DF off"
-hue, since every call here ran without dynamic filtering). Keep them in step. In this
-figure shape means fault type, not vendor, and every marker is filled (user's choice).
+Vendor colours follow the paper's figure style (Anthropic = the "dynamic filtering off"
+hue, since every call here ran without dynamic filtering). In this figure shape means
+fault type, not vendor, and every marker is filled.
 """
 import argparse
 import csv
@@ -36,14 +42,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
 # --- runs -------------------------------------------------------------------
-FAULT_RUNS = {
-    "A": ["run20261008-205249-kqsuv", "run20261010-190856-brrjp", "run20261013-070000-iq5kp"],
-    "B": ["run20261025-192546-u7swp", "run20261028-070001-mm2ba", "run20261030-130001-rt7qx"],
-}
+# Filled from --runs: server label (A, B) -> fault run ids.
+FAULT_RUNS = {}
 # Success baseline: the same fault runner and question, asked about /fault/flaky/0 (a
-# page that works at once). Every run in this file is used; a call counts only when the
-# model quoted at least one of the page's depth codes (the page was really retrieved).
-BASELINE_FILE = {"A": None, "B": "faults-originb-baseline.jsonl"}
+# page that works at once). Filled from --baseline: server label -> that run's
+# -fault-outFile. Every run in the file is used; a call counts only when the model
+# quoted at least one of the page's depth codes (the page was really retrieved).
+BASELINE_FILE = {}
 
 CATEGORY = {
     "404": "Error reply", "500": "Error reply", "503": "Error reply", "429": "Error reply",
@@ -56,7 +61,7 @@ CATS = ["Error reply", "Redirect loop", "Dropped connection", "Slow page", "Cut-
 VENDORS = ["openai", "anthropic", "xai"]
 LABEL = {"openai": "OpenAI\ngpt-5-mini", "anthropic": "Anthropic\nclaude-sonnet-5", "xai": "xAI\ngrok-4.3"}
 
-# The agreed table (origin A, origin B), to check the recomputation to the token.
+# The paper's table (origin A, origin B), to check a recomputation to the token (--check-paper).
 EXPECTED = {
     "Error reply": {"openai": (4962, 4953), "anthropic": (2937, 2928), "xai": (4122, 3294)},
     "Redirect loop": {"openai": (4977, 5394), "anthropic": (2946, 2937), "xai": (2532, 4075)},
@@ -104,10 +109,25 @@ def med(xs):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--logs", default="logs")
-    ap.add_argument("--out", default="doc/figures")
+    ap.add_argument("--logs", default="logs", help="folder holding results/faults-<run>.jsonl")
+    ap.add_argument("--out", default="figures")
+    ap.add_argument("--runs", action="append", required=True, metavar="A=RUN,RUN,...",
+                    help="per server (A or B): the fault run ids")
+    ap.add_argument("--baseline", action="append", default=[], metavar="A=FILE",
+                    help="per server (A or B): the -fault-outFile of the success-baseline run")
+    ap.add_argument("--check-paper", action="store_true", help="compare medians with the paper's table")
     a = ap.parse_args()
     res = os.path.join(a.logs, "results")
+    for spec in a.runs:
+        o, _, ids = spec.partition("=")
+        if o not in ("A", "B") or not ids:
+            sys.exit(f"bad --runs {spec!r}: want A=<run>,<run> or B=<run>,...")
+        FAULT_RUNS[o] = [x for x in ids.split(",") if x]
+    for spec in a.baseline:
+        o, _, path = spec.partition("=")
+        if o not in ("A", "B") or not path:
+            sys.exit(f"bad --baseline {spec!r}: want A=<file> or B=<file>")
+        BASELINE_FILE[o] = path
 
     calls = {}          # (category, vendor, origin) -> [input tokens]
     questions = {}      # source -> set of questions
@@ -122,7 +142,7 @@ def main():
     for origin, fname in BASELINE_FILE.items():
         if fname is None:
             continue
-        path = os.path.join(a.logs, fname)
+        path = fname
         if not os.path.exists(path):
             sys.exit(f"STOP: the success baseline file {path} is missing; nothing is drawn without it.")
         ok = {}
@@ -136,19 +156,20 @@ def main():
                     questions.setdefault(f"success baseline, origin {origin}, {rid}", set()).add(r["question"])
 
     missing = [o for o in ("A", "B") if not any(k[1] == o for k in success)]
-    if len(missing) == 2:
+    if not success:
         sys.exit("STOP: no successful baseline calls found; the success line cannot be drawn.")
 
     # --- checks: recomputed per-origin medians vs the agreed table ----------------
-    print("CHECK 1 — recomputed origin medians vs the agreed table (to the token)")
-    diffs = 0
-    for c in CATS:
-        for v in VENDORS:
-            got = (med(calls.get((c, v, "A"), [])), med(calls.get((c, v, "B"), [])))
-            if got != EXPECTED[c][v]:
-                diffs += 1
-                print(f"  DIFFERS  {c} / {v}: table {EXPECTED[c][v]}, logs {got}")
-    print(f"  {diffs} cell(s) differ" if diffs else "  all 42 origin medians match the table exactly")
+    if a.check_paper:
+        print("CHECK 1 — recomputed origin medians vs the paper's table (to the token)")
+        diffs = 0
+        for c in CATS:
+            for v in VENDORS:
+                got = (med(calls.get((c, v, "A"), [])), med(calls.get((c, v, "B"), [])))
+                if got != EXPECTED[c][v]:
+                    diffs += 1
+                    print(f"  DIFFERS  {c} / {v}: table {EXPECTED[c][v]}, logs {got}")
+        print(f"  {diffs} cell(s) differ" if diffs else "  all 42 origin medians match the table exactly")
 
     # --- the numbers ------------------------------------------------------------
     rows = []

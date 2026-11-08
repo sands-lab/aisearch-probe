@@ -3,7 +3,7 @@
 Each anchor is a public endpoint whose value only climbs, so any value a vendor returns is
 datable against our ground-truth poll. `extract` pulls the live value for ground truth;
 `question` is the verbatim prompt we give each vendor (fetch the URL, return ONLY the value).
-Probed live & confirmed 2026-10-07. See doc/monotonic-anchors.md.
+Each was checked live on 2026-10-07.
 """
 import json, re
 

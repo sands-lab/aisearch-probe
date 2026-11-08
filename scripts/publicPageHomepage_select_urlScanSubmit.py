@@ -15,7 +15,7 @@ Env: CLOUDFLARE_API_TOKEN (URL Scanner Write), CLOUDFLARE_ACCOUNT_ID
 Usage: publicPageHomepage_select_urlScanSubmit.py submit <sites.txt> <submitted.jsonl>
        publicPageHomepage_select_urlScanSubmit.py read   <submitted.jsonl> <results.jsonl>
        publicPageHomepage_select_urlScanSubmit.py one    <host>            # permission test: submit ONE scan, print the reply
-Pure logic is unit-tested in submit_scans_test.py.
+Pure logic is unit-tested in publicPageHomepage_select_urlScanSubmit_test.py.
 """
 import sys, os, json, time, urllib.request
 from urllib.error import HTTPError

@@ -3,17 +3,23 @@
 Four panels (one per vendor), shared y = the 9 endpoints grouped by Cache-Control stance,
 x = staleness (hours behind live), symlog. Each box = that vendor x endpoint's ~80 samples.
 Anthropic dated by its own retrieved_at; the others by interpolation on the 5-min poll.
-Google x USGS is the known read-out bug -> blanked. Saves PNG + PDF to doc/figures/.
-Style follows doc/figure-style-rules.md (7pt text, fonttype 42, fixed vendor hues)."""
-import json, datetime, re
+Google x USGS is a known read-out bug -> blanked. Saves PNG + PDF.
+Style: 7pt text, fonttype 42, fixed vendor hues.
+Usage: publicPageEndpoint_plot.py [--answers <publicPageEndpoint_run.py output>]
+                                  [--truth <publicPageEndpoint_poll.py output>] [--out <path without extension>]"""
+import argparse, json, datetime, re
 from collections import defaultdict
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
-PB = "logs/results/anchor-probe-lifetime.jsonl"; TR = "logs/results/anchor-truth-lifetime.jsonl"
-OUT = "doc/figures/anchor-lifetime-staleness"
+_ap = argparse.ArgumentParser(description="Draw staleness per vendor and public endpoint.")
+_ap.add_argument("--answers", default="logs/results/anchor-probe-lifetime.jsonl", help="the vendor answers")
+_ap.add_argument("--truth", default="logs/results/anchor-truth-lifetime.jsonl", help="the 5-min live values")
+_ap.add_argument("--out", default="anchor-lifetime-staleness", help="output path without extension")
+_args = _ap.parse_args()
+PB, TR, OUT = _args.answers, _args.truth, _args.out
 
 def t(s): return datetime.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
 

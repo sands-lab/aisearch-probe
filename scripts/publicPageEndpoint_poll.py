@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Ground-truth poller for the 3-day lifetime run: polls ONLY the 9 run anchors, every INTERVAL
-seconds, self-terminates after duration_sec. Standalone (does not touch the shared anchor_poll.py).
+seconds, and stops after duration_sec. Makes no vendor calls.
 Dates OpenAI/xAI/Google; Anthropic self-dates via retrieved_at and does not need this.
 Usage: publicPageEndpoint_poll.py <out.jsonl> [interval_sec=300] [duration_sec=infinite]"""
 import sys, os, ssl, socket, json, time, urllib.request
@@ -27,6 +27,7 @@ def fetch(a):
         return a["extract"](r.read())
 
 def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"): sys.exit(__doc__)
     out = sys.argv[1]
     interval = int(sys.argv[2]) if len(sys.argv) > 2 else 300
     duration = int(sys.argv[3]) if len(sys.argv) > 3 else None

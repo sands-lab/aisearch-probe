@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
-"""Public XML file-type test (doc/public_page_validation_notes.md; write-up: file types are validated
-on public sites for XML only). Asks four AI services to read real XML files published by the watched
+"""Public XML file-type test (method: docs/experiments/publicPage.md; file types are tested on
+public sites for XML only). Asks four AI services to read real XML files published by the watched
 sites — sitemaps and RSS/Atom feeds, by DECLARED type (application/xml, text/xml, rss, atom) — plus
 llms.txt files served as text/plain as a contrast, and scores whether each answer shows the file
 was read.
 
 Steps:
   select  <files-all.jsonl> <files-test.jsonl>      pick the test files (rules in select_files)
-  keys    <files-test.jsonl> <keys.jsonl>           fresh answer keys; run on the US server (KAUST
-                                                    blocks some sites); robots.txt checked per file
+  keys    <files-test.jsonl> <keys.jsonl>           fresh answer keys; run on your download server
+                                                    (a machine the sites let in); robots.txt checked per file
   ask     <files-test.jsonl> <answers.jsonl> [--vendors openai,anthropic,xai,google] [--limit N] [--no-pause]
                                                     the AI questions; run here. One lane per vendor,
                                                     1 call every 3 min, lanes offset by 30 s; Google
-                                                    pauses 07:00-09:30 UTC (another session's Gemini
-                                                    run); restart-safe; a file STOP next to answers
+                                                    pauses 07:00-09:30 UTC unless --no-pause
+                                                    (an old scheduling clash); restart-safe; a file STOP next to answers
                                                     ends all lanes cleanly; a lane stops at a 429
                                                     that survives its retries
   score   <answers.jsonl> <keys1.jsonl> [<keys2.jsonl> ...]
-Every call records its token use (input/output) — a standing project rule.
+Every call records its token use (input/output).
 Calls reuse publicPage_run's providers with: 5-min timeout, at most 3 retries (30 s, 60 s, 120 s
 apart) only on 429/5xx, never after a timeout (a timed-out Anthropic call can still be billed);
 Anthropic uses the BASIC web_fetch_20250910 with max_content_tokens=20000.
-Pure logic is unit-tested in file_test_test.py.
+Pure logic is unit-tested in publicPageXmlFile_run_test.py.
 """
 import sys, os, re, json, time, random, threading, datetime as dt, urllib.error
 from collections import Counter, defaultdict
@@ -126,8 +126,8 @@ def cmd_keys(src, dst):
     ks = _load(dst); print(len(ks), "keys; with content:", sum(1 for k in ks if k["key"]))
 
 def cmd_ask(src, dst, vendors, limit=None, pause=True, interval=INTERVAL, start_in=5):
-    """pause=False (--no-pause) skips the old Google pause (added for another session's Gemini run,
-    which ended 29 Oct). interval/start_in exist for the tests; runs use the defaults.
+    """pause=False (--no-pause) skips the Google pause (kept so the runs can be repeated as they were;
+    a new user wants --no-pause). interval/start_in exist for the tests; runs use the defaults.
     Each call goes through publicPageHomepage_select_anchor.ask_one (from 2026-10-30), so the record also keeps the raw
     reply, every failed try's error message (failed_tries) and Google's 2-try limit."""
     import publicPageHomepage_select_anchor

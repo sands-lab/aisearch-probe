@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for publicPageHomepage_select_urlScanSearch.py. Run: python3 search_public_scans_test.py
+"""TEST-FIRST spec for publicPageHomepage_select_urlScanSearch.py. Run: python3 -m pytest publicPageHomepage_select_urlScanSearch_test.py
 Covers the search query, picking the newest scan from a search reply, pulling the category
 section out of a scan report untouched, and the summary counts.
 """

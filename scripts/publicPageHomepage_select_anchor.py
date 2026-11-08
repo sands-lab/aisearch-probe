@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Capability check before the staleness test: does each AI service find a page's anchor line and
 quote the words that follow it? Asks on the RANDOM-TAG address (forces a fresh fetch), so stale
-copies cannot confuse the result. Question approved by the user 2026-10-28 (DECISIONS D14):
+copies cannot confuse the result. The question is fixed:
 'Fetch this document: <address>. Quote exactly the first 12 words that follow the line "<anchor>"
 in it. If you cannot read the document, say so plainly.'
 Words, not lines: each service splits a page into lines differently (blank lines, image text, dates).
@@ -13,12 +13,18 @@ is skipped that round and the reason recorded.
 
 Steps:
   anchors  <candidates.jsonl> <watch.jsonl> <snapshots> <anchors.jsonl>   offline, from watch data
-  snap     <sites.txt> <out.jsonl>        run on the US server: one download per site (HTML + text)
+  snap     <sites.txt> <out.jsonl>        run on your download server: one download per site (HTML + text)
   ask      <anchors.jsonl> <sites.txt> <snap-before.jsonl> <answers.jsonl> [--vendors ...]
                                           here; live anchor gate first; 4 services, 60 s apart
   score    <answers.jsonl> <snapA.jsonl>[,<snapB.jsonl>]
 Every call records all token fields, the provider's own fetch status and its stop reason.
-Pure logic is unit-tested in anchor_check_test.py.
+Pure logic is unit-tested in publicPageHomepage_select_anchor_test.py.
+
+The download server is a machine the sites let in (some block cloud or university ranges). The
+staleness run downloads each page there over ssh, around each page's questions. Settings:
+  PROBE_SNAP_HOST  the ssh host of your download server (as you would type it after `ssh`)
+  PROBE_SNAP_DIR   the folder on that server holding a copy of scripts/
+  PROBE_CONTACT    your contact, sent in the User-Agent of every download
 """
 import sys, os, re, json, time, gzip, hashlib, secrets, collections, urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -187,19 +193,23 @@ def cmd_snap(sites_p, out_p):
     print("snapped", sum(1 for _ in open(out_p)))
 
 def cmd_snap1(o):
-    """Run on the US server: download one page now and print it as one JSON line."""
+    """Run on the download server: download one page now and print it as one JSON line."""
     from publicPageHomepage_select_sites import name_tag
     print(json.dumps(snap_one(o, name_tag(os.environ)), ensure_ascii=False))
 
-def remote_snap_cmd(origin, contact, host="probe-vps"):
+def remote_snap_cmd(origin, contact, host, folder):
+    """The ssh command that downloads one page on the download server (host, folder: see above)."""
     import shlex
     return ["ssh", "-o", "BatchMode=yes", host,
-            f"cd ~/public-files && PROBE_CONTACT={shlex.quote(contact)} python3 publicPageHomepage_select_anchor.py snap1 {shlex.quote(origin)}"]
+            f"cd {shlex.quote(folder)} && PROBE_CONTACT={shlex.quote(contact)} python3 publicPageHomepage_select_anchor.py snap1 {shlex.quote(origin)}"]
 
 def remote_snap(origin):
-    """Download one page from the US server right now (per-page copies around each page's questions)."""
+    """Download one page on the download server right now (per-page copies around each page's questions)."""
     import subprocess
-    p = subprocess.run(remote_snap_cmd(origin, os.environ["PROBE_CONTACT"]), capture_output=True, text=True, timeout=180)
+    for k in ("PROBE_SNAP_HOST", "PROBE_SNAP_DIR", "PROBE_CONTACT"):
+        if not os.environ.get(k): sys.exit(f"{k} is not set (see the top of publicPageHomepage_select_anchor.py)")
+    cmd = remote_snap_cmd(origin, os.environ["PROBE_CONTACT"], os.environ["PROBE_SNAP_HOST"], os.environ["PROBE_SNAP_DIR"])
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
     lines = [l for l in p.stdout.splitlines() if l.startswith("{")]
     return json.loads(lines[-1]) if lines else {"origin": origin, "error": "remote snap failed: " + p.stderr[-200:]}
 

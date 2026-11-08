@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Day-0 scan for the public-page validation (doc/public_page_validation_notes.md section 3).
+"""Day-0 scan for the public homepage test (method: docs/experiments/publicPage.md).
 One polite pass over the CrUX sample, no AI calls: per site, the homepage's status, final
 address, caching headers, sizes, visible-text size, body hash, a script-only-shell flag, a
 block-page sign, and robots.txt verdicts for every AI fetcher name. Failures are typed
-(dns / timeout / reset / tls ...) so a KAUST-side block can later be told from a site-side
-one by rerunning the failed sites from outside KAUST.
+(dns / timeout / reset / tls ...) so a block on your own network can later be told from a
+site-side one by rerunning the failed sites from another network.
 
 The name tag is honest and carries a contact address taken from $PROBE_CONTACT only. The
 address is never written in code or in the output; the scan refuses to run without it.
 
-Pure logic is unit-tested in day0_scan_test.py (TEST-FIRST).
+Pure logic is unit-tested in publicPageHomepage_select_sites_test.py (TEST-FIRST).
 Usage: PROBE_CONTACT=... publicPageHomepage_select_sites.py <crux.csv.gz> <out-dir> [workers]
 """
 import sys, os, ssl, socket, json, time, gzip, csv, random, hashlib, re, ipaddress

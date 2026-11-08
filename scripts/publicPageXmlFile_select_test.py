@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """TEST-FIRST spec for publicPageXmlFile_select.py (public XML / Markdown / CSV files for the file-type check).
-Run: python3 find_files_test.py
+Run: python3 -m pytest publicPageXmlFile_select_test.py
 """
 from publicPageXmlFile_select import sitemap_urls, feed_links, csv_links, declared_format, sitemap_csv_locs, pick, named_format, unpack
 

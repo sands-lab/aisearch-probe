@@ -4,7 +4,7 @@ Outcomes are fixed before the run; reason codes come from provider evidence and 
 Order (first match wins): failed -> valid read (inconclusive / stale / fresh) -> refused -> off-target
 -> unclassified. A valid read is checked BEFORE refusal wording, because real answers mix the two
 (OpenAI on carview: "I can't provide the exact verbatim lines" + a correct excerpt).
-Run: python3 classify_answers_test.py
+Run: python3 -m pytest publicPageHomepage_score_answerKinds_test.py
 """
 from publicPageHomepage_score_answerKinds import classify
 

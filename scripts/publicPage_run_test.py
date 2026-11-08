@@ -2,7 +2,7 @@
 """TEST-FIRST spec for the provider fetch-status extractors in publicPage_run.py.
 Every AI-call runner must record each provider's OWN report of what happened to the fetch, not
 just the answer and tokens (a Google refusal of every application/xml file once went unexplained
-because urlRetrievalStatus was dropped). Run: python3 anchor_probe_test.py
+because urlRetrievalStatus was dropped). Run: python3 -m pytest publicPage_run_test.py
 """
 from publicPage_run import (gemini_fetch_status, anthropic_fetch_status, openrouter_fetch_status, stop_reason,
                           anthropic_fetched_texts, pack_raw, unpack_raw)

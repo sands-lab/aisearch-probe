@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Find the watched pages whose real content changes within the AI test's 20-minute wait
-(doc/public_page_validation_notes.md 4.5/4.7). Offline: reads the watch's visit log and saved
+(method: docs/experiments/publicPage.md). Offline: reads the watch's visit log and saved
 page text (scripts/publicPageHomepage_poll.py output); no requests to any site.
 
 A REAL change = a line that appears between two neighbouring visits (10 min apart) and is still
@@ -12,7 +12,7 @@ Per site: share of 10-minute steps with a real change (ranking), median gap betw
 where the first changed line sits (median line number, p10-p90 spread), example lines, labels.
 Keep: HTML, answered on >= 100 visits, median gap <= 20 min. Counted with and without the
 position limits (first 100 lines, spread <= 5) so their cost is visible before deciding.
-Pure logic is unit-tested in find_changing_pages_test.py.
+Pure logic is unit-tested in publicPageHomepage_select_changes_test.py.
 Usage: publicPageHomepage_select_changes.py <watch.jsonl> <snapshots-dir> <out.jsonl> [labels: search.jsonl,new-results.jsonl]
 """
 import sys, os, re, json, gzip, hashlib, collections
@@ -116,11 +116,11 @@ def main():
         at = [s["at"] for s in steps]; gm = median(gaps_minutes(at)); idx = [s["first_index"] for s in steps]
         host = origin.split("://", 1)[1]
         changed_at = set(at); elig = eligible_steps(cyc)
-        # hour of each judged step, in Riyadh time (UTC+3), for scheduling questions at busy hours
-        hours = busy_hours([((int(vs[i]["ts"][11:13]) + 3) % 24, cyc[i] in changed_at) for i in elig])
+        # hour of each judged step, in UTC, for scheduling questions at busy hours
+        hours = busy_hours([(int(vs[i]["ts"][11:13]), cyc[i] in changed_at) for i in elig])
         row = {"origin": origin, "visits": len(vs), "real_changes": len(steps),
                "share_of_steps_with_real_change": round(len(steps) / max(1, len(elig)), 3),
-               "busy_hours_riyadh": [h for h, s in hours.items() if s >= 0.5], "hourly_share_riyadh": hours,
+               "busy_hours_utc": [h for h, s in hours.items() if s >= 0.5], "hourly_share_utc": hours,
                "median_gap_min": gm, "first_line_median": median(idx), "first_line_spread": position_spread(idx),
                "examples": [l for s in steps[:3] for l in s["lines"][:1]], "labels": labels.get(host),
                "cache_control": (vs[-1].get("headers") or {}).get("cache-control")}

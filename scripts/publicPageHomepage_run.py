@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
-"""Staleness test on public pages (design agreed with the user 2026-10-28).
+"""Staleness test on public pages.
 
-Per page, at a start time inside an hour that page usually changes (busy_hours_riyadh):
-  copy A    download from the US server, anchor checked on it (exactly once, or the page is skipped)
+Per page, at a start time inside an hour that page usually changes (busy_hours_utc):
+  copy A    download from your download server, anchor checked on it (exactly once, or the page is skipped)
   warm-up   each service asked on the PLAIN address
   +20 min   each service asked twice AT THE SAME MOMENT: plain address, and address + random tag
             (the tag makes a new address, so the service has no copy of it and must read the page)
-  copy B    download from the US server
+  copy B    download from your download server
 Stale only if the plain answer has text found only in copy A AND the tagged answer from the same
-moment does not. Question: the approved D14 wording (12 words / 30 characters), see publicPageHomepage_select_anchor.
+moment does not. Question: the fixed wording in publicPageHomepage_select_anchor (12 words / 30 characters).
 
 Steps:
   plan  <anchors.jsonl> <candidates.jsonl> <start UTC, e.g. 2026-10-29T09:00:00Z> <plan.jsonl> [--seed N --gap 240]
   run   <plan.jsonl> <answers.jsonl> [--vendors openai,anthropic,xai] [--wait-min 20]
         copies go to <answers.jsonl>.copies.jsonl; a restart skips pages already finished
   score <answers.jsonl>
-Needs PROBE_CONTACT (the downloader's contact, never committed) and the provider keys in the env.
-Pure logic is unit-tested in stale_check_test.py.
+Needs PROBE_CONTACT (your contact, sent in the User-Agent of every download), PROBE_SNAP_HOST and
+PROBE_SNAP_DIR (your download server, see publicPageHomepage_select_anchor) and the provider keys in the env.
+All times are UTC. Pure logic is unit-tested in publicPageHomepage_run_test.py.
 """
 import sys, os, json, time, random, secrets, threading, collections, urllib.parse
 from datetime import datetime, timezone, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from publicPageHomepage_select_anchor import (question, tagged, live_gate, spaceless, remote_snap, ask_id, ask_one, _load, MODELS)
 
-RIYADH = timedelta(hours=3)
 LATE_OK_S = 300          # a page whose start passed more than this at launch is recorded as missed
 
 def _iso(t): return t.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -35,22 +35,21 @@ def plain(url):
     return urllib.parse.urlunsplit(p._replace(path=p.path or "/"))
 
 def plan(pages, start, gap_s=240, seed=0, days=3):
-    """One start time per page, inside one of its busy Riyadh hours, at least gap_s/2 apart.
+    """One start time per page, inside one of its busy hours (UTC), at least gap_s/2 apart.
     Pages with the fewest busy hours are placed first; each start gets a random offset in its slot."""
     rng = random.Random(seed)
-    order = sorted(pages, key=lambda p: (len(p["busy_hours_riyadh"]), rng.random()))
+    order = sorted(pages, key=lambda p: (len(p["busy_hours_utc"]), rng.random()))
     taken, out = set(), []
     n_slots = days * 86400 // gap_s
     for p in order:
-        busy = set(p["busy_hours_riyadh"])
+        busy = set(p["busy_hours_utc"])
         for k in range(n_slots):
             slot = start + timedelta(seconds=k * gap_s)
-            if k in taken or (slot + RIYADH).hour not in busy or \
-               (slot + timedelta(seconds=gap_s // 2) + RIYADH).hour not in busy: continue
+            if k in taken or slot.hour not in busy or \
+               (slot + timedelta(seconds=gap_s // 2)).hour not in busy: continue
             taken.add(k)
             t = slot + timedelta(seconds=rng.uniform(0, gap_s / 2))
-            out.append({"origin": p["origin"], "anchor": p["anchor"], "start": _iso(t),
-                        "start_riyadh": (t + RIYADH).strftime("%Y-%m-%d %H:%M:%S")})
+            out.append({"origin": p["origin"], "anchor": p["anchor"], "start": _iso(t)})
             break
     return sorted(out, key=lambda r: r["start"])
 
@@ -69,7 +68,7 @@ def _write(fo, rec):
         fo.write(json.dumps(rec, ensure_ascii=False) + "\n"); fo.flush()
 
 def _say(msg):
-    with _lock: print(f"{(datetime.now(timezone.utc) + RIYADH).strftime('%H:%M:%S')} KSA  {msg}", flush=True)
+    with _lock: print(f"{datetime.now(timezone.utc).strftime('%H:%M:%S')} UTC  {msg}", flush=True)
 
 def _sleep_until(t):
     while (d := (t - datetime.now(timezone.utc)).total_seconds()) > 0: time.sleep(min(d, 30))
@@ -113,12 +112,12 @@ def run_page(row, vendors, wait_min, fo, co):
 
 def cmd_plan(anchors_p, cand_p, start, out_p, seed, gap):
     anchors = {r["origin"]: r["anchor"] for r in _load(anchors_p) if r.get("anchor")}
-    pages = [{"origin": c["origin"], "anchor": anchors[c["origin"]], "busy_hours_riyadh": c["busy_hours_riyadh"]}
+    pages = [{"origin": c["origin"], "anchor": anchors[c["origin"]], "busy_hours_utc": c["busy_hours_utc"]}
              for c in _load(cand_p) if c["origin"] in anchors]
     p = plan(pages, _parse(start), gap_s=gap, seed=seed)
     with open(out_p, "x") as fo:
         for r in p: fo.write(json.dumps({**r, "seed": seed, "gap_s": gap}, ensure_ascii=False) + "\n")
-    print(f"{len(p)} of {len(pages)} pages placed; first {p[0]['start_riyadh']} KSA, last {p[-1]['start_riyadh']} KSA")
+    print(f"{len(p)} of {len(pages)} pages placed; first {p[0]['start']}, last {p[-1]['start']}")
 
 def cmd_run(plan_p, out_p, vendors, wait_min):
     if not os.environ.get("PROBE_CONTACT"): sys.exit("PROBE_CONTACT is not set")

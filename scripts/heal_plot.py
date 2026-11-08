@@ -5,17 +5,20 @@ AI go back and see the fix?
 One figure, saved as PNG and PDF:
   heal-timeline   one mark per re-ask, placed at its ACTUAL time after the fix.
                   COLOUR + FILL = what happened at that re-ask (fetch yes/no x code
-                  yes/no); SHAPE = which origin served the page (circle = origin A,
-                  through Cloudflare; triangle = origin B, direct). Rows = vendor x
+                  yes/no); SHAPE = which server served the page (circle = the first
+                  --origin, triangle = the second, ...). Rows = vendor x
                   the failure the page showed before its fix; within a row, one lane
                   per sitting.
 
-Input: the JSON written by `probe-trial -heal-report -heal-report-json <file>`, one
+Input: the JSON written by `probe-trial -heal-report -heal-reportFile <file>`, one
 file per sitting (any origin). The runner applies the rules (only requests between
 sending the question and the answer count; "code" = the answer quoted one of the
 fixed page's codes), so this script only draws — it never needs the page secret.
 
-Usage: heal_plot.py --out <figure dir> [--name heal-timeline] <results.json> ...
+Usage: heal_plot.py --out <figure dir> [--name heal-timeline]
+                    [--origin <host>=<legend label> ...] <results.json> ...
+--origin names each server host found in the results and its legend label, in legend order.
+Without it, every host in the results is shown under its own name.
 """
 import argparse
 import json
@@ -28,9 +31,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
-# Reference palette (dataviz skill), categorical slots 1-3, validated light-mode
-# (scripts/validate_palette.js: all checks pass; slot 3 below 3:1 contrast, so it is
-# always legend-labelled and carries a fill). Fill + colour carry the outcome, shape
+# Reference palette, categorical slots 1-3, validated for light mode (slot 3 is below
+# 3:1 contrast, so it is always legend-labelled and carries a fill). Fill + colour carry the outcome, shape
 # the origin, so colour is never the only cue. Same surface/ink as correction_plot.py.
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
 INK, INK2, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#8a8984", "#e6e5e0", "#fcfcfb"
@@ -50,10 +52,11 @@ OUTCOME = {
     "fetched_old": dict(face=ORANGE, edge=INK, label="New request; still said broken"),
     "code_no_fetch": dict(face=AQUA, edge=AQUA, label="No new request; read the fix"),
 }
-ORIGINS = {"probe.attentionhub.org": ("o", "Origin A (Cloudflare)"),
-           "agentfetchlab.com": ("^", "Origin B (direct)")}
+# Filled in main(): server host -> (marker, legend label).
+ORIGINS = {}
+MARKERS = ["o", "^", "s", "D"]
 
-# The agreed check grid (trial/healrun.go defaultHealChecks), as tick labels.
+# The default check grid (trial/healrun.go defaultHealChecks), as tick labels.
 TICKS = [(5, "5 min"), (10, "10 min"), (20, "20 min"), (40, "40 min"), (80, "1 h 20"),
          (160, "2 h 40"), (320, "5 h 20"), (640, "10 h 40")]
 
@@ -72,7 +75,7 @@ def outcome(r):
 
 # A page whose first answer came back before any request reached us never tested a
 # remembered failure: the vendor answered before it had our failure page. Left out of
-# the figure and listed on stdout, for a side note (user, 2026-10-30).
+# the figure and listed on stdout.
 NOT_A_TEST = "no request reached us during the first ask"
 
 
@@ -172,9 +175,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--name", default="heal-timeline")
+    ap.add_argument("--origin", action="append", default=[], metavar="HOST=LABEL",
+                    help="a server host in the results and its legend label, in legend order")
     ap.add_argument("results", nargs="+")
     args = ap.parse_args()
     rows = load(args.results)
+    for spec in args.origin:
+        host, _, label = spec.partition("=")
+        ORIGINS[host] = (MARKERS[len(ORIGINS) % len(MARKERS)], label or host)
+    for host in sorted({r["origin"] for r in rows} - set(ORIGINS)):
+        ORIGINS[host] = (MARKERS[len(ORIGINS) % len(MARKERS)], host)
     plot_timeline(rows, args.out, args.name)
     counts = Counter((r["origin"], r["provider"], r["fail"], outcome(r)) for r in rows)
     for k in sorted(counts):

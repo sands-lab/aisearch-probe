@@ -8,7 +8,7 @@ adult labels; it does NOT cover their CIPA or Gambling labels.
 
 One DNS-over-HTTPS lookup per site, one at a time, 2/s. Nothing is sent to the sites themselves,
 and no account or token is needed.
-Pure logic is unit-tested in family_dns_check_test.py.
+Pure logic is unit-tested in publicPageHomepage_select_adultSites_test.py.
 Usage: publicPageHomepage_select_adultSites.py <sites.txt> <out.jsonl>
 """
 import sys, json, time, urllib.request, urllib.parse

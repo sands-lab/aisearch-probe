@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Combined two-panel figure: (a) 8 KB variance bars, (b) HTML depth curve.
-Draft layout — reuses the same pooled records as the standalone scripts. Fix/tune later.
+"""Dynamic-filtering figure, two panels: (a) input tokens per document type at 8 KB, filtering off
+vs on, (b) input tokens against HTML page size.
+Reads the read-depth result records of the dynamic-filtering rounds (dynFilter_run.sh).
+Usage: dynFilter_plot.py [--out <path without extension>] [result files ...]
+       (default files: logs/results/truncprobe-run*.jsonl)
 """
-import json, glob, re, statistics as st
+import argparse, json, glob, re, statistics as st
 
 import matplotlib
 matplotlib.use("Agg")
@@ -12,6 +15,18 @@ from matplotlib.patches import Patch
 
 OFF_C, ON_C = "#5b6ee1", "#d97757"
 FMT = ["txt", "html", "md", "json", "xml", "csv", "pdf", "docx"]
+
+# Depth page addresses: the current /depth/<fmt>/ and the older /depth<fmt>page/.
+PAGE_RE = re.compile(r"/depth(?:/([A-Za-z]+)/|([a-z]+)page/)")
+
+def page_fmt(url):
+    m = PAGE_RE.search(url or "")
+    return (m.group(1) or m.group(2)) if m else None
+
+_ap = argparse.ArgumentParser(description="Draw the dynamic-filtering figure.")
+_ap.add_argument("--out", default="dynamic-filtering", help="output path without extension")
+_ap.add_argument("files", nargs="*", help="result files (default logs/results/truncprobe-run*.jsonl)")
+ARGS = _ap.parse_args()
 
 
 def cell(v, w):
@@ -23,7 +38,7 @@ def cell(v, w):
 # ---- load all pooled records once ----
 by8k = {}       # (cell, fmt) -> [tokens]  at 8 KB
 byhtml = {}     # (cell, size) -> [tokens] for html
-for f in sorted(glob.glob("logs/results/truncprobe-run*.jsonl")):
+for f in sorted(ARGS.files or glob.glob("logs/results/truncprobe-run*.jsonl")):
     for line in open(f):
         r = json.loads(line); ex = r.get("extra", {})
         if ex.get("part") != "A":
@@ -32,12 +47,12 @@ for f in sorted(glob.glob("logs/results/truncprobe-run*.jsonl")):
         it = r.get("input_tokens")
         if not (c and it):
             continue
-        m = re.search(r"/depth([a-z]+)page/", r.get("url", ""))
-        if not m:
+        fmt = page_fmt(r.get("url", ""))
+        if not fmt:
             continue
         if ex.get("size_bytes") == 8192:
-            by8k.setdefault((c, m.group(1)), []).append(it)
-        if m.group(1) == "html":
+            by8k.setdefault((c, fmt), []).append(it)
+        if fmt == "html":
             byhtml.setdefault((c, ex.get("size_bytes")), []).append(it)
 
 fig, (axA, axB) = plt.subplots(1, 2, figsize=(17, 6.5), dpi=200)
@@ -91,7 +106,7 @@ axB.grid(True, which="major", ls=":", alpha=0.4); axB.legend(loc="upper left", f
 
 fig.tight_layout()
 
-out = "doc/figures/dynamic-filtering-combined"
+out = ARGS.out
 for ext in ("png", "pdf", "svg"):
     fig.savefig(f"{out}.{ext}", bbox_inches="tight")
 print("wrote", out + ".{png,pdf,svg}")

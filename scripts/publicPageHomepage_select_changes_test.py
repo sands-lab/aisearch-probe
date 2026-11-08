@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TEST-FIRST spec for publicPageHomepage_select_changes.py. Run: python3 find_changing_pages_test.py
+"""TEST-FIRST spec for publicPageHomepage_select_changes.py. Run: python3 -m pytest publicPageHomepage_select_changes_test.py
 A REAL change is a new line that is still there on the next visit (lasts >= 20 min); lines that
 show for one visit only (ads, rotating boxes) and clock/date-like lines are noise.
 """

@@ -30,7 +30,7 @@ func TestCcDepthServesEachSettingsHeaders(t *testing.T) {
 	for _, tok := range probe.CacheSettingOrder {
 		set := probe.CacheSettings[tok]
 		for _, v := range probe.ValidatorModes {
-			path := "/ccdepthpage/" + tok + "/" + string(v) + "/cd-" + tok + "-" + string(v) + "/4096"
+			path := "/cacheHeaders/" + tok + "/" + string(v) + "/cd-" + tok + "-" + string(v) + "/4096"
 			resp := get(t, srv.URL+path, nil)
 			resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
@@ -71,12 +71,12 @@ func TestCcDepthServesEachSettingsHeaders(t *testing.T) {
 // HTML page for the same id and size, whatever the setting. Only headers differ.
 func TestCcDepthBodyIsTheSharedDepthHTML(t *testing.T) {
 	srv, _, _ := newTestProxy(t, ccDepthServer(t, time.Now()), "")
-	want := body(t, get(t, srv.URL+"/depthhtmlpage/same-id/8192", nil))
+	want := body(t, get(t, srv.URL+"/depth/html/same-id/8192", nil))
 	for _, tok := range []string{"nostore", "max3600", "none"} {
 		for _, v := range []string{"tag", "notag"} {
-			got := body(t, get(t, srv.URL+"/ccdepthpage/"+tok+"/"+v+"/same-id/8192", nil))
+			got := body(t, get(t, srv.URL+"/cacheHeaders/"+tok+"/"+v+"/same-id/8192", nil))
 			if got != want {
-				t.Errorf("%s/%s: body differs from /depthhtmlpage/ for the same id and size", tok, v)
+				t.Errorf("%s/%s: body differs from /depth/html/ for the same id and size", tok, v)
 			}
 		}
 	}
@@ -86,16 +86,16 @@ func TestCcDepthBodyIsTheSharedDepthHTML(t *testing.T) {
 func TestCcDepthMalformedIs404(t *testing.T) {
 	srv, _, _ := newTestProxy(t, ccDepthServer(t, time.Now()), "")
 	for _, p := range []string{
-		"/ccdepthpage/",
-		"/ccdepthpage/none/tag/id",        // no size
-		"/ccdepthpage/none/tag/id/",       // empty size
-		"/ccdepthpage/none//id/4096",      // empty version word
-		"/ccdepthpage//tag/id/4096",       // empty setting
-		"/ccdepthpage/bogus/tag/id/4096",  // unknown setting
-		"/ccdepthpage/none/bogus/id/4096", // unknown version word
-		"/ccdepthpage/none/tag/id/abc",    // size not a number
-		"/ccdepthpage/none/tag/id/4096/x", // extra segment
-		"/ccdepthpage/none/tag//4096",     // empty id
+		"/cacheHeaders/",
+		"/cacheHeaders/none/tag/id",        // no size
+		"/cacheHeaders/none/tag/id/",       // empty size
+		"/cacheHeaders/none//id/4096",      // empty version word
+		"/cacheHeaders//tag/id/4096",       // empty setting
+		"/cacheHeaders/bogus/tag/id/4096",  // unknown setting
+		"/cacheHeaders/none/bogus/id/4096", // unknown version word
+		"/cacheHeaders/none/tag/id/abc",    // size not a number
+		"/cacheHeaders/none/tag/id/4096/x", // extra segment
+		"/cacheHeaders/none/tag//4096",     // empty id
 	} {
 		resp := get(t, srv.URL+p, nil)
 		resp.Body.Close()
@@ -103,7 +103,7 @@ func TestCcDepthMalformedIs404(t *testing.T) {
 			t.Errorf("%s returned %d, want 404", p, resp.StatusCode)
 		}
 	}
-	resp := get(t, srv.URL+"/ccdepthpage/none/tag/id/100", nil)
+	resp := get(t, srv.URL+"/cacheHeaders/none/tag/id/100", nil)
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("a size too small for the markers returned %d, want 400", resp.StatusCode)
@@ -115,7 +115,7 @@ func TestCcDepthMalformedIs404(t *testing.T) {
 func TestCcDepthNeedsTheSecret(t *testing.T) {
 	s := newStaticServer(t.TempDir(), "")
 	srv, _, _ := newTestProxy(t, s, "")
-	resp := get(t, srv.URL+"/ccdepthpage/none/tag/id/4096", nil)
+	resp := get(t, srv.URL+"/cacheHeaders/none/tag/id/4096", nil)
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("status %d without a secret, want 503", resp.StatusCode)
@@ -130,8 +130,8 @@ func TestNoRealPageShadowsTheCcDepthPrefix(t *testing.T) {
 	}
 	for _, e := range entries {
 		name := strings.ToLower(e.Name())
-		if name == "ccdepthpage" || strings.HasPrefix(name, "ccdepthpage.") {
-			t.Errorf("probe-site/%s would shadow the reserved %s prefix", e.Name(), ccDepthPrefix)
+		if name == "cacheheaders" || strings.HasPrefix(name, "cacheheaders.") {
+			t.Errorf("site/%s would shadow the reserved %s prefix", e.Name(), ccDepthPrefix)
 		}
 	}
 }
@@ -143,7 +143,7 @@ func TestNoRealPageShadowsTheCcDepthPrefix(t *testing.T) {
 func TestCcDepthPageCarriesEveryNamedCode(t *testing.T) {
 	srv, _, _ := newTestProxy(t, ccDepthServer(t, time.Now()), "")
 	id := "label-pairing"
-	page := body(t, get(t, srv.URL+"/ccdepthpage/none/tag/"+id+"/2048", nil))
+	page := body(t, get(t, srv.URL+"/cacheHeaders/none/tag/"+id+"/2048", nil))
 	for _, pct := range probe.DepthPercents {
 		code := probe.DepthCode(fmtTestSecret, id, pct, probe.DepthPageRevision)
 		want := probe.DepthMarkerPrefix + code + " is " + probe.DepthMarkerLabel(pct)

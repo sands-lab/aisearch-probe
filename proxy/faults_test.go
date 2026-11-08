@@ -243,7 +243,7 @@ func TestNoRealPageShadowsTheFaultPrefix(t *testing.T) {
 	}
 	for _, e := range entries {
 		if strings.EqualFold(e.Name(), "fault") || strings.HasPrefix(strings.ToLower(e.Name()), "fault.") {
-			t.Errorf("probe-site/%s would shadow the reserved /fault/ prefix", e.Name())
+			t.Errorf("site/%s would shadow the reserved /fault/ prefix", e.Name())
 		}
 	}
 }
@@ -533,7 +533,7 @@ func TestContentEndingFaultsServeTheDepthPage(t *testing.T) {
 	}
 }
 
-// The fault page is the cache-header test's page (/ccdepthpage/ at its default
+// The fault page is the cache-header test's page (/cacheHeaders/ at its default
 // 2048 bytes, HTML) with the two fault lines added on top — the same renderer,
 // size and type, so the setup is uniform across experiments.
 func TestFaultDepthPageMatchesTheCacheHeaderPage(t *testing.T) {
@@ -554,7 +554,7 @@ func TestFaultDepthPageMatchesTheCacheHeaderPage(t *testing.T) {
 	resp := getRaw(t, srv.URL+"/fault/flaky/0?probe=ct")
 	resp.Body.Close()
 	if ct := resp.Header.Get("Content-Type"); ct != "text/html; charset=utf-8" {
-		t.Errorf("Content-Type %q, want text/html like /ccdepthpage/", ct)
+		t.Errorf("Content-Type %q, want text/html like /cacheHeaders/", ct)
 	}
 }
 

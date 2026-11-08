@@ -56,7 +56,7 @@ func main() {
 		resolveFlag = flag.String("resolve", "",
 			"host:ip to use for OUR OWN probe address, like curl --resolve. Only needed where DNS-over-HTTPS is blocked too; the driver falls back to it automatically")
 		sharingTest = flag.Bool("sharingApi-run", false,
-			"Run the sharing experiment: does one caller's download serve another caller's question? -siteUrl is the origin; each run makes two fresh 2 KB /depthhtmlpage/ pages, matched on their own codes (needs -pageCodeSecret). Both callers get the IDENTICAL address — never use for retention")
+			"Run the sharing experiment: does one caller's download serve another caller's question? -siteUrl is the origin; each run makes two fresh 2 KB /depth/html/ pages, matched on their own codes (needs -pageCodeSecret). Both callers get the IDENTICAL address — never use for retention")
 		sharingBaseline = flag.Bool("sharingApi-run-sameCaller", false,
 			"Run the sharing test with one caller asked twice (the reference): -sharingApi-firstCaller and -sharingApi-secondCaller name the SAME caller")
 		sharingFirst = flag.String("sharingApi-firstCaller", "openai",
@@ -82,7 +82,7 @@ func main() {
 		onlyFlag = flag.String("vendors", "",
 			"Comma-separated provider names to keep from the active set (e.g. \"or:anthropic\" or \"google\"); empty = all with a key. Lets one provider be run in isolation without touching the credentials file")
 		correctionPlan = flag.Bool("correction-plan", false,
-			"Correction run: write the state file for fresh changeable pages (/verhtmlpage/, /vertxtpage/), one per vendor x format x trial. Calls NO API. Needs -siteUrl (origin base) and -correction-askAgainTimes; then run -correction-loop or -correction-step")
+			"Correction run: write the state file for fresh changeable pages (/correction/html/, /correction/txt/), one per vendor x format x trial. Calls NO API. Needs -siteUrl (origin base) and -correction-askAgainTimes; then run -correction-loop or -correction-step")
 		correctionTick = flag.Bool("correction-step", false,
 			"Correction run: fire every step now due (set A + warm-up, switch to B after the settle time, ask-agains) and exit. For cron")
 		correctionLoop = flag.Bool("correction-loop", false,
@@ -110,7 +110,7 @@ func main() {
 		correctionLocalOrigin = flag.String("correction-controlUrl", "http://localhost:8899",
 			"Correction run: the origin's LOCAL address, where the version control is called (bypasses Cloudflare). Providers still fetch the public -siteUrl")
 		healPlan = flag.Bool("heal-plan", false,
-			"Remembered-failure run: plan a sitting (no API call) — one fresh /healpage/ per vendor x check time x failure, written to -heal-stateFile. Needs -siteUrl, -pageCodeSecret, -controlSecret")
+			"Remembered-failure run: plan a sitting (no API call) — one fresh /heal/ per vendor x check time x failure, written to -heal-stateFile. Needs -siteUrl, -pageCodeSecret, -controlSecret")
 		healTick = flag.Bool("heal-step", false,
 			"Remembered-failure run: fire whatever is due once (create broken + first ask, fix 5 min after the answer, re-ask at its check)")
 		healLoop = flag.Bool("heal-loop", false,
@@ -150,7 +150,7 @@ func main() {
 		ttlmapKeep = flag.Bool("cacheHeaders-askAfterRefetch", false,
 			"Cache-header test: keep asking a page at every gap even after the vendor downloads it again (default: stop at the first download-again)")
 		ttlmapCcdepth = flag.Bool("cacheHeaders-run", false,
-			"Run the cache-header test: 19 pages on /ccdepthpage/ (the depth HTML page at -cacheHeaders-pageSize), one per caching-header setting with and without version info, each graded against what RFC 9111 allows a shared cache for the headers sent. Needs -siteUrl, -serverLog and -pageCodeSecret")
+			"Run the cache-header test: 19 pages on /cacheHeaders/ (the depth HTML page at -cacheHeaders-pageSize), one per caching-header setting with and without version info, each graded against what RFC 9111 allows a shared cache for the headers sent. Needs -siteUrl, -serverLog and -pageCodeSecret")
 		ttlmapSize = flag.Int("cacheHeaders-pageSize", 2048,
 			"Cache-header test: page size in bytes; small on purpose, a kept page is billed as input tokens on every ask")
 		truncprobe = flag.Bool("readDepth-run", false,
@@ -159,8 +159,8 @@ func main() {
 			"Read-depth test: largest page size in bytes to test; rungs above it are dropped (0 = no cap, full 64KiB..4MiB ladder). The multi-MB rungs drive nearly all the cost, so cap this (e.g. 2097152 for 2 MiB) to keep a run cheap. If a fetcher reads past the cap the result is just \">cap\".")
 		truncprobeSizes = flag.String("readDepth-sizes", "",
 			"Read-depth test: exact page sizes to test instead of the default ladder, e.g. \"2k,4k,8k,16k,32k,64k\" (k=KiB, m=MiB). Use for the small-doc end (measuring a search extract window). Overrides -readDepth-maxSize. Smallest usable size is ~2k (5 markers must fit).")
-		truncprobeRoute = flag.String("readDepth-page", "/depthhtmlpage/",
-			"Read-depth test: which depth page kind to ask about, e.g. /depthhtmlpage/ (default), /depthpdfpage/, /depthjsinlinepage/")
+		truncprobeRoute = flag.String("readDepth-page", "/depth/html/",
+			"Read-depth test: which depth page kind to ask about, e.g. /depth/html/ (default), /depth/pdf/, /depth/jsInline/")
 		truncprobeReps = flag.Int("readDepth-repeats", 1,
 			"Read-depth test: independent pages per (provider, size), so a noisy tool (e.g. OpenAI web_search) is sampled n=reps instead of once. Each rep is a fresh page.")
 		faults = flag.Bool("fault-run", false,
@@ -467,7 +467,7 @@ func main() {
 		if *dryRunFlag {
 			os.Exit(runTTLMap(*urlFlag, active, arms, *ttlmapReplicates, 0, 0, 0, explicitGaps, *pageCodeSecret, "", *forceFlag, true))
 		}
-		lock, lerr := acquireRunLock(ttlmapLockPath, "cache-header test", []string{"generated /ccdepthpage/ addresses (own lock)"})
+		lock, lerr := acquireRunLock(ttlmapLockPath, "cache-header test", []string{"generated /cacheHeaders/ addresses (own lock)"})
 		if lerr != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
 			os.Exit(1)
@@ -554,7 +554,7 @@ func main() {
 		// Its own lock per comparison: the pages are generated per run (none under
 		// probe-site/), so different comparisons can run side by side.
 		lock, lerr := acquireRunLock(sharingLockPath(a, b, *sharingFirstUser, *sharingSecondUser), "sharing experiment",
-			[]string{"generated /depthhtmlpage/sh-<run>/ addresses"})
+			[]string{"generated /depth/html/sh-<run>/ addresses"})
 		if lerr != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
 			os.Exit(1)

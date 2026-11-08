@@ -102,18 +102,18 @@ func TestDepthPDFRoundTrip(t *testing.T) {
 	assertCodesInOrder(t, out.String())
 }
 
-// TestDepthCtSameBytesDifferentLabel is the clean lever: /depthctpage/ serves the
+// TestDepthCtSameBytesDifferentLabel is the clean lever: /depth/declaredType/ serves the
 // IDENTICAL body under different content-type tokens, so a read-depth difference
 // between them is purely the label, not the layout.
 func TestDepthCtSameBytesDifferentLabel(t *testing.T) {
 	srv, _, _ := newTestProxy(t, cpageServer(t, depthFmtSecret), "")
 
-	rp := get(t, srv.URL+"/depthctpage/plain/ab/8192", nil)
+	rp := get(t, srv.URL+"/depth/declaredType/plain/ab/8192", nil)
 	ctp := rp.Header.Get("Content-Type")
 	etp := rp.Header.Get("ETag")
 	bp := body(t, rp)
 
-	rh := get(t, srv.URL+"/depthctpage/html/ab/8192", nil)
+	rh := get(t, srv.URL+"/depth/declaredType/html/ab/8192", nil)
 	cth := rh.Header.Get("Content-Type")
 	eth := rh.Header.Get("ETag")
 	bh := body(t, rh)
@@ -137,7 +137,7 @@ func TestDepthCtSameBytesDifferentLabel(t *testing.T) {
 		t.Errorf("want all 5 markers in the body, got %d", n)
 	}
 	// A bad token must 404, not serve.
-	rbad := get(t, srv.URL+"/depthctpage/bogus/ab/8192", nil)
+	rbad := get(t, srv.URL+"/depth/declaredType/bogus/ab/8192", nil)
 	rbad.Body.Close()
 	if rbad.StatusCode != http.StatusNotFound {
 		t.Errorf("unknown content-type token returned %d, want 404", rbad.StatusCode)

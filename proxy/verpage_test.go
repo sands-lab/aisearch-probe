@@ -19,7 +19,7 @@ import (
 // pin the spec before the code exists:
 //   - version 1 IS the existing 2 KB depth page, byte for byte (reuse, not a new page)
 //   - version N is the same page with the codes made at revision N — nothing else moves
-//   - the version is server state set by POST /control/version, never in the request
+//   - the version is server state set by POST /control/correction, never in the request
 //   - Last-Modified is the time the current version was set, so a date-only
 //     revalidation after a flip is answered with the new page, not a 304
 //   - an id never set by the control is a 404; the control is secret-guarded
@@ -71,8 +71,8 @@ func TestVersionOneIsTheDepthPage(t *testing.T) {
 	setVersion(t, srv.URL, "cv-a", 1)
 
 	for _, pair := range [][2]string{
-		{"/verhtmlpage/cv-a/2048", "/depthhtmlpage/cv-a/2048"},
-		{"/vertxtpage/cv-a/2048", "/depthtxtpage/cv-a/2048"},
+		{"/correction/html/cv-a/2048", "/depth/html/cv-a/2048"},
+		{"/correction/txt/cv-a/2048", "/depth/txt/cv-a/2048"},
 	} {
 		ver := get(t, srv.URL+pair[0], nil)
 		dep := get(t, srv.URL+pair[1], nil)
@@ -97,7 +97,7 @@ func TestVersionCodesAreOnThePage(t *testing.T) {
 	srv, _, _ := newTestProxy(t, st, "")
 	setVersion(t, srv.URL, "cv-b", 2)
 
-	for _, path := range []string{"/verhtmlpage/cv-b/2048", "/vertxtpage/cv-b/2048"} {
+	for _, path := range []string{"/correction/html/cv-b/2048", "/correction/txt/cv-b/2048"} {
 		first := body(t, get(t, srv.URL+path, nil))
 		if again := body(t, get(t, srv.URL+path, nil)); again != first {
 			t.Errorf("%s: two fetches of the same version differ", path)
@@ -120,7 +120,7 @@ func TestFlipChangesCodesTagAndDateOnly(t *testing.T) {
 	st, clock := verServer(t, "")
 	srv, _, _ := newTestProxy(t, st, "")
 
-	for _, path := range []string{"/verhtmlpage/cv-c/2048", "/vertxtpage/cv-c/2048"} {
+	for _, path := range []string{"/correction/html/cv-c/2048", "/correction/txt/cv-c/2048"} {
 		*clock = time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
 		setVersion(t, srv.URL, "cv-c", 1)
 		a := get(t, srv.URL+path, nil)
@@ -162,7 +162,7 @@ func TestFlipChangesCodesTagAndDateOnly(t *testing.T) {
 func TestRevalidationAfterFlip(t *testing.T) {
 	st, clock := verServer(t, "")
 	srv, _, _ := newTestProxy(t, st, "")
-	path := srv.URL + "/verhtmlpage/cv-d/2048"
+	path := srv.URL + "/correction/html/cv-d/2048"
 
 	setVersion(t, srv.URL, "cv-d", 1)
 	a := get(t, path, nil)
@@ -242,7 +242,7 @@ func TestControlReplyTagsMatchServedPages(t *testing.T) {
 func TestUnknownIDIs404(t *testing.T) {
 	st, _ := verServer(t, "")
 	srv, _, _ := newTestProxy(t, st, "")
-	for _, path := range []string{"/verhtmlpage/never-set/2048", "/vertxtpage/never-set/2048"} {
+	for _, path := range []string{"/correction/html/never-set/2048", "/correction/txt/never-set/2048"} {
 		resp := get(t, srv.URL+path, nil)
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusNotFound {
@@ -258,10 +258,10 @@ func TestMalformedAddresses(t *testing.T) {
 	srv, _, _ := newTestProxy(t, st, "")
 	setVersion(t, srv.URL, "cv-g", 1)
 	for path, want := range map[string]int{
-		"/verhtmlpage/cv-g":        http.StatusNotFound,
-		"/verhtmlpage/cv-g/2048/x": http.StatusNotFound,
-		"/vertxtpage/cv-g/abc":     http.StatusNotFound,
-		"/verhtmlpage/cv-g/100":    http.StatusBadRequest,
+		"/correction/html/cv-g":        http.StatusNotFound,
+		"/correction/html/cv-g/2048/x": http.StatusNotFound,
+		"/correction/txt/cv-g/abc":     http.StatusNotFound,
+		"/correction/html/cv-g/100":    http.StatusBadRequest,
 	} {
 		resp := get(t, srv.URL+path, nil)
 		resp.Body.Close()
@@ -310,7 +310,7 @@ func TestVersionControlGuards(t *testing.T) {
 		}
 	}
 	// None of the refused calls may have created the page.
-	if r := get(t, srv.URL+"/verhtmlpage/cv-h/2048", nil); r.StatusCode != http.StatusNotFound {
+	if r := get(t, srv.URL+"/correction/html/cv-h/2048", nil); r.StatusCode != http.StatusNotFound {
 		t.Errorf("a refused control call created the page (status %d)", r.StatusCode)
 	}
 
@@ -330,7 +330,7 @@ func TestVersionPageNeedsPageSecret(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv, _, _ := newTestProxy(t, st, "")
-	resp := get(t, srv.URL+"/verhtmlpage/cv-i/2048", nil)
+	resp := get(t, srv.URL+"/correction/html/cv-i/2048", nil)
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("status %d, want 503 without the page-code secret", resp.StatusCode)
@@ -345,14 +345,14 @@ func TestVersionFetchIsLoggedAndControlIsNot(t *testing.T) {
 	setVersion(t, srv.URL, "cv-j", 1)
 	*clock = clock.Add(5 * time.Minute)
 	rep := setVersion(t, srv.URL, "cv-j", 2)
-	resp := get(t, srv.URL+"/verhtmlpage/cv-j/2048", nil)
+	resp := get(t, srv.URL+"/correction/html/cv-j/2048", nil)
 	body(t, resp)
 
 	recs := read()
 	if len(recs) != 1 {
 		t.Fatalf("logged %d records, want exactly the one page GET", len(recs))
 	}
-	if recs[0].PageKey != "/verhtmlpage/cv-j/2048" || recs[0].ETagSent != rep.ETags["html"]["2"] {
+	if recs[0].PageKey != "/correction/html/cv-j/2048" || recs[0].ETagSent != rep.ETags["html"]["2"] {
 		t.Errorf("logged %q tag %q, want the page with version 2's tag %q", recs[0].PageKey, recs[0].ETagSent, rep.ETags["html"]["2"])
 	}
 }
@@ -366,12 +366,12 @@ func TestVersionStateSurvivesRestart(t *testing.T) {
 	setVersion(t, srv.URL, "cv-k", 1)
 	*clock = clock.Add(5 * time.Minute)
 	setVersion(t, srv.URL, "cv-k", 2)
-	before := get(t, srv.URL+"/verhtmlpage/cv-k/2048", nil)
+	before := get(t, srv.URL+"/correction/html/cv-k/2048", nil)
 	beforeBody := body(t, before)
 
 	st2, _ := verServer(t, statePath) // the "restarted" origin
 	srv2, _, _ := newTestProxy(t, st2, "")
-	after := get(t, srv2.URL+"/verhtmlpage/cv-k/2048", nil)
+	after := get(t, srv2.URL+"/correction/html/cv-k/2048", nil)
 	if got := body(t, after); got != beforeBody {
 		t.Error("after a restart the page serves different bytes")
 	}

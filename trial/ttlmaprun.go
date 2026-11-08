@@ -258,7 +258,7 @@ func selectArms(arms []ttlArm, labels string) ([]ttlArm, error) {
 }
 
 // ccDepthArms is the CACHE-HEADER TEST: one arm per (setting, version info) on
-// /ccdepthpage/, the shared depth HTML at a fixed size, so only the caching
+// /cacheHeaders/, the shared depth HTML at a fixed size, so only the caching
 // headers vary. The settings come from probe.CacheSettings (RFC 9111 + the most
 // common real-world combination). Every "don't reuse without asking" setting runs
 // with and without version info (for no-cache, max-age=0 and combo, "check first"
@@ -277,7 +277,7 @@ func ccDepthArms(size int) []ttlArm {
 		return ttlArm{
 			Label: "cc-" + setting + "-" + string(v),
 			URL: func(base, id string) string {
-				return strings.TrimRight(base, "/") + "/ccdepthpage/" + setting + "/" + string(v) + "/" + id + "/" + strconv.Itoa(size)
+				return strings.TrimRight(base, "/") + "/cacheHeaders/" + setting + "/" + string(v) + "/" + id + "/" + strconv.Itoa(size)
 			},
 			Code:        code,
 			RotateDepth: true,

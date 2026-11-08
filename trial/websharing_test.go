@@ -52,7 +52,7 @@ func TestWebSharingPlanMatchesTheAPIRun(t *testing.T) {
 		if !strings.Contains(got, s.url) || !strings.Contains(got, s.question) {
 			t.Errorf("step %d: web prompt lost the address or the question: %q", i+1, got)
 		}
-		if !strings.Contains(s.url, "/depthhtmlpage/") || !strings.HasSuffix(s.url, "/2048") {
+		if !strings.Contains(s.url, "/depth/html/") || !strings.HasSuffix(s.url, "/2048") {
 			t.Errorf("step %d: not the 2 KB depth page: %s", i+1, s.url)
 		}
 		if s.want != probe.DepthCode(secret, s.id, s.wantDepth, probe.DepthPageRevision) || s.want == "" {
@@ -165,14 +165,14 @@ func TestReportSharingThreeSteps(t *testing.T) {
 // other sizes carry the same codes (Mistral fetched /4096 … /1048576 on
 // 2026-10-11). The control page has a different id and must not match.
 func TestSamePageCountsEverySizeOfThePage(t *testing.T) {
-	const u = "https://h.test/depthhtmlpage/sh-run1-mistral/2048"
-	for _, p := range []string{"/depthhtmlpage/sh-run1-mistral/2048", "/depthhtmlpage/sh-run1-mistral/4096",
-		"/depthhtmlpage/sh-run1-mistral/2048.html", "/depthhtmlpage/sh-run1-mistral/", "/depthhtmlpage/sh-run1-mistral"} {
+	const u = "https://h.test/depth/html/sh-run1-mistral/2048"
+	for _, p := range []string{"/depth/html/sh-run1-mistral/2048", "/depth/html/sh-run1-mistral/4096",
+		"/depth/html/sh-run1-mistral/2048.html", "/depth/html/sh-run1-mistral/", "/depth/html/sh-run1-mistral"} {
 		if !samePage(p, u) {
 			t.Errorf("%s must count as the same page", p)
 		}
 	}
-	for _, p := range []string{"/depthhtmlpage/sh-run1-mistral-ctl/2048", "/depthhtmlpage/sh-run1-claude/2048", "/favicon.ico"} {
+	for _, p := range []string{"/depth/html/sh-run1-mistral-ctl/2048", "/depth/html/sh-run1-claude/2048", "/favicon.ico"} {
 		if samePage(p, u) {
 			t.Errorf("%s must NOT count as the same page", p)
 		}
@@ -184,18 +184,18 @@ func TestSamePageCountsEverySizeOfThePage(t *testing.T) {
 // answering on 2026-10-11) are reported apart. Other pages, other hosts and our
 // own probes never count; any size of the page does.
 func TestSplitFetchesAtTheAnswer(t *testing.T) {
-	const u = "https://h.test/depthhtmlpage/sh-r-grok/2048"
+	const u = "https://h.test/depth/html/sh-r-grok/2048"
 	rec := func(ts float64, path, bot string) probe.Record {
 		return probe.Record{TSUnix: ts, TS: "2026-10-11T00:00:00Z", URL: "https://h.test" + path, PageKey: path, Bot: bot, StatusCode: 200}
 	}
 	recs := []probe.Record{
-		rec(99, "/depthhtmlpage/sh-r-grok/2048", "unknown"),         // before the prompt: not this step
-		rec(105, "/depthhtmlpage/sh-r-grok/2048", "unknown"),        // before the answer
-		rec(106, "/depthhtmlpage/sh-r-grok/4096", "unknown"),        // another size: still this page
-		rec(107, "/depthhtmlpage/sh-r-grok/2048", "probe-liveness"), // our own probe
-		rec(108, "/depthhtmlpage/sh-r-grok-ctl/2048", "unknown"),    // the control page
-		rec(130, "/depthhtmlpage/sh-r-grok/2048", "unknown"),        // after the answer
-		rec(300, "/depthhtmlpage/sh-r-grok/2048", "unknown"),        // after the window
+		rec(99, "/depth/html/sh-r-grok/2048", "unknown"),         // before the prompt: not this step
+		rec(105, "/depth/html/sh-r-grok/2048", "unknown"),        // before the answer
+		rec(106, "/depth/html/sh-r-grok/4096", "unknown"),        // another size: still this page
+		rec(107, "/depth/html/sh-r-grok/2048", "probe-liveness"), // our own probe
+		rec(108, "/depth/html/sh-r-grok-ctl/2048", "unknown"),    // the control page
+		rec(130, "/depth/html/sh-r-grok/2048", "unknown"),        // after the answer
+		rec(300, "/depth/html/sh-r-grok/2048", "unknown"),        // after the window
 	}
 	before, after := splitFetches(recs, u, 100, 120, 200)
 	if len(before) != 2 || len(after) != 1 {

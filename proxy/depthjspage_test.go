@@ -76,7 +76,7 @@ func depthJSGet(t *testing.T, path string) (string, *http.Response) {
 const depthJSSize = "/sz-abc/20000" // depthFmtID at depthFmtBytes
 
 // THE GO↔JAVASCRIPT PAIR: run the served script for real and require it to write
-// exactly the lines /depthhtmlpage/ prints below the top marker, with every depth
+// exactly the lines /depth/html/ prints below the top marker, with every depth
 // code back in order.
 func TestDepthJSScriptRebuildsTheLines(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -149,10 +149,10 @@ func TestDepthJSExtPagePointsAtItsFile(t *testing.T) {
 // The script file answers only at its .js name; a malformed address is never a page.
 func TestDepthJSMalformedIs404(t *testing.T) {
 	for _, p := range []string{
-		"/depthjsfile/sz-abc/20000",
-		"/depthjsfile/sz-abc.js",
-		"/depthjsinlinepage/sz-abc",
-		"/depthjsdatapage/",
+		"/depth/jsExternalScript/sz-abc/20000",
+		"/depth/jsExternalScript/sz-abc.js",
+		"/depth/jsInline/sz-abc",
+		"/depth/jsData/",
 	} {
 		if _, resp := depthJSGet(t, p); resp.StatusCode != http.StatusNotFound {
 			t.Errorf("%s: status %d, want 404", p, resp.StatusCode)
@@ -173,20 +173,6 @@ func TestDepthJSScrambleRoundTrip(t *testing.T) {
 	}
 	if depthJSSeed("x", 4096) == depthJSSeed("y", 4096) || depthJSSeed("x", 4096) == depthJSSeed("x", 8192) {
 		t.Error("seed does not depend on both id and size")
-	}
-}
-
-// A switch time that is not a number, or not after the fixed page date, is a typo.
-func TestDepthJSVerMalformedIs404(t *testing.T) {
-	for _, p := range []string{
-		"/depthjsverpage/sz-abc/soon/20000",
-		"/depthjsverpage/sz-abc/1000/20000", // before probe.PageLastModified
-		"/depthjsverpage/sz-abc/20000",
-		"/depthjsverfile/sz-abc/1893456000/20000", // no .js
-	} {
-		if _, resp := depthJSGet(t, p); resp.StatusCode != http.StatusNotFound {
-			t.Errorf("%s: status %d, want 404", p, resp.StatusCode)
-		}
 	}
 }
 

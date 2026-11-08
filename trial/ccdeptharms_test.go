@@ -55,7 +55,7 @@ func TestCcDepthArmsBuildTheRightAddresses(t *testing.T) {
 			t.Errorf("duplicate page id %q", pg.PageID)
 		}
 		seen[pg.PageID] = true
-		frag := "/ccdepthpage/" + pg.Setting + "/" + string(pg.Validators) + "/" + pg.PageID + "/2048"
+		frag := "/cacheHeaders/" + pg.Setting + "/" + string(pg.Validators) + "/" + pg.PageID + "/2048"
 		if !strings.HasSuffix(pg.URL, frag) {
 			t.Errorf("%s: url %q, want it to end %q", pg.Arm, pg.URL, frag)
 		}

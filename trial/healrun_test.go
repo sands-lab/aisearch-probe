@@ -12,7 +12,7 @@ import (
 )
 
 // THE REMEMBERED-FAILURE RUN (heal redo). Agreed design, 2026-10-22:
-//   - one fresh /healpage/ per vendor x check time x failure (503, 404, 403); the
+//   - one fresh /heal/ per vendor x check time x failure (503, 404, 403); the
 //     control creates it broken, it is asked once (the "first ask", depth-95% code),
 //     fixed 5 min after that answer came back (a timer, never a fetch count), and
 //     asked again ONCE at its check time after the fix (depth-50% code)
@@ -78,7 +78,7 @@ func TestBuildHealPages(t *testing.T) {
 			t.Errorf("duplicate id %s", pg.PageID)
 		}
 		ids[pg.PageID] = true
-		if want := "/healpage/" + pg.PageID + "/2048"; pg.Path != want || pg.URL != "https://probe.example.org"+want {
+		if want := "/heal/" + pg.PageID + "/2048"; pg.Path != want || pg.URL != "https://probe.example.org"+want {
 			t.Errorf("%s: path %q url %q", pg.PageID, pg.Path, pg.URL)
 		}
 		if !strings.Contains(pg.PageID, "-heal"+pg.Fail+"-") {

@@ -154,9 +154,9 @@ func buildDepthFormatRaw(s *staticServer, w http.ResponseWriter, r *http.Request
 	return render(lines), name, contentType, pageHeaders{}, true
 }
 
-// --- /depthtxtpage/ --------------------------------------------------------
+// --- /depth/txt/ --------------------------------------------------------
 
-const depthTxtPrefix = "/depthtxtpage/"
+const depthTxtPrefix = "/depth/txt/"
 
 type depthTxtRoute struct{}
 
@@ -171,9 +171,9 @@ func (depthTxtRoute) build(s *staticServer, w http.ResponseWriter, r *http.Reque
 	return buildDepthFormat(s, w, r, depthTxtPrefix, renderDepthTxt, "depth.txt", "text/plain; charset=utf-8")
 }
 
-// --- /depthpdfpage/ --------------------------------------------------------
+// --- /depth/pdf/ --------------------------------------------------------
 
-const depthPdfPrefix = "/depthpdfpage/"
+const depthPdfPrefix = "/depth/pdf/"
 
 // depthPdfLinesPerPage keeps every line inside the MediaBox so pdftotext (and a
 // vendor extractor) returns all of it — the single-page experiment showed off-page
@@ -242,15 +242,15 @@ func (depthPdfRoute) build(s *staticServer, w http.ResponseWriter, r *http.Reque
 // --- /depthpdfrawpage/ — FAULT INJECTION, investigation only ----------------
 // Serves the PDF built from the pre-fix INVALID-UTF-8 payload (chopped multi-byte
 // chars), to test whether that corruption is what triggered Anthropic's pause_turn cost
-// bomb (the clean /depthpdfpage/ never bombs — FINDINGS). Deliberately NOT a general
+// bomb (the clean /depth/pdf/ never bombs — FINDINGS). Deliberately NOT a general
 // format route: it exists only so one Anthropic call can be run against corrupted PDF
 // bytes and its `rounds` compared to the clean one. Retire once the question is settled.
 
 const depthPdfRawPrefix = "/depthpdfrawpage/"
 
-// --- /depthdocxpage/ -------------------------------------------------------
+// --- /depth/docx/ -------------------------------------------------------
 
-const depthDocxPrefix = "/depthdocxpage/"
+const depthDocxPrefix = "/depth/docx/"
 
 type depthDocxRoute struct{}
 
@@ -293,15 +293,15 @@ func (depthDocxRoute) build(s *staticServer, w http.ResponseWriter, r *http.Requ
 		"application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 }
 
-// --- /depthctpage/ — the content-type LABEL lever --------------------------
+// --- /depth/declaredType/ — the content-type LABEL lever --------------------------
 //
 // Serves the IDENTICAL line-based body under a content-type chosen by a path token
-// (/depthctpage/<token>/<id>/<bytes>). Same bytes, only the label differs, so a
+// (/depth/declaredType/<token>/<id>/<bytes>). Same bytes, only the label differs, so a
 // read-depth difference between tokens is purely the content-type — the clean,
-// byte-identical A/B that /depthpage/-vs-/depthtxtpage/ could not be (their bodies
+// byte-identical A/B that /depthpage/-vs-/depth/txt/ could not be (their bodies
 // differ in layout). This is how we isolate "does the stamp change the read window".
 
-const depthCtPrefix = "/depthctpage/"
+const depthCtPrefix = "/depth/declaredType/"
 
 // depthCtTypes maps a path token to the Content-Type served. The body is the same
 // prose+markers regardless; only this label changes. A test pins the table.
@@ -420,7 +420,7 @@ func renderDepthCSV(lines []string) []byte {
 
 // --- routes for the five added formats ---------------------------------------
 
-const depthMdPrefix = "/depthmdpage/"
+const depthMdPrefix = "/depth/md/"
 
 type depthMdRoute struct{}
 
@@ -430,7 +430,7 @@ func (depthMdRoute) build(s *staticServer, w http.ResponseWriter, r *http.Reques
 	return buildDepthFormat(s, w, r, depthMdPrefix, renderDepthMd, "depth.md", "text/markdown; charset=utf-8")
 }
 
-const depthHTMLPrefix = "/depthhtmlpage/"
+const depthHTMLPrefix = "/depth/html/"
 
 type depthHTMLRoute struct{}
 
@@ -440,7 +440,7 @@ func (depthHTMLRoute) build(s *staticServer, w http.ResponseWriter, r *http.Requ
 	return buildDepthFormat(s, w, r, depthHTMLPrefix, renderDepthHTML, "depth.html", "text/html; charset=utf-8")
 }
 
-const depthJSONPrefix = "/depthjsonpage/"
+const depthJSONPrefix = "/depth/json/"
 
 type depthJSONRoute struct{}
 
@@ -450,7 +450,7 @@ func (depthJSONRoute) build(s *staticServer, w http.ResponseWriter, r *http.Requ
 	return buildDepthFormat(s, w, r, depthJSONPrefix, renderDepthJSON, "depth.json", "application/json")
 }
 
-const depthXMLPrefix = "/depthxmlpage/"
+const depthXMLPrefix = "/depth/xml/"
 
 type depthXMLRoute struct{}
 
@@ -460,7 +460,7 @@ func (depthXMLRoute) build(s *staticServer, w http.ResponseWriter, r *http.Reque
 	return buildDepthFormat(s, w, r, depthXMLPrefix, renderDepthXML, "depth.xml", "application/xml; charset=utf-8")
 }
 
-const depthCSVPrefix = "/depthcsvpage/"
+const depthCSVPrefix = "/depth/csv/"
 
 type depthCSVRoute struct{}
 

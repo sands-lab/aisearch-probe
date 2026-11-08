@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -67,15 +68,15 @@ func TestGeneratedRouteContentTypes(t *testing.T) {
 		path     string
 		wantType string
 	}{
-		{"/ccdepthpage/none/tag/ct-a/4096", "text/html; charset=utf-8"},
-		{"/depthhtmlpage/ct-a/4096", "text/html; charset=utf-8"},
-		{"/depthjsonpage/ct-a/4096", "application/json"},
-		{"/depthtxtpage/ct-a/4096", "text/plain; charset=utf-8"},
-		{"/depthmdpage/ct-a/4096", "text/markdown; charset=utf-8"},
-		{"/depthxmlpage/ct-a/4096", "application/xml; charset=utf-8"},
-		{"/depthcsvpage/ct-a/4096", "text/csv; charset=utf-8"},
-		{"/depthpdfpage/ct-a/4096", "application/pdf"},
-		{"/depthdocxpage/ct-a/4096", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+		{"/cacheHeaders/none/tag/ct-a/4096", "text/html; charset=utf-8"},
+		{"/depth/html/ct-a/4096", "text/html; charset=utf-8"},
+		{"/depth/json/ct-a/4096", "application/json"},
+		{"/depth/txt/ct-a/4096", "text/plain; charset=utf-8"},
+		{"/depth/md/ct-a/4096", "text/markdown; charset=utf-8"},
+		{"/depth/xml/ct-a/4096", "application/xml; charset=utf-8"},
+		{"/depth/csv/ct-a/4096", "text/csv; charset=utf-8"},
+		{"/depth/pdf/ct-a/4096", "application/pdf"},
+		{"/depth/docx/ct-a/4096", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
 	}
 	for _, c := range cases {
 		t.Run(c.path, func(t *testing.T) {
@@ -97,28 +98,28 @@ func TestGeneratedRouteContentTypes(t *testing.T) {
 func TestGenPageRoutesCoverAndGate(t *testing.T) {
 	wantSecret := map[string]bool{
 		// The cache-header test serves the shared depth content (per-page codes).
-		"/ccdepthpage/": true,
+		"/cacheHeaders/": true,
 		// The depth page in each format, and the declared-type variant.
-		"/depthtxtpage/":  true,
-		"/depthpdfpage/":  true,
-		"/depthdocxpage/": true,
-		"/depthctpage/":   true,
-		"/depthmdpage/":   true,
-		"/depthhtmlpage/": true,
-		"/depthjsonpage/": true,
-		"/depthxmlpage/":  true,
-		"/depthcsvpage/":  true,
+		"/depth/txt/":          true,
+		"/depth/pdf/":          true,
+		"/depth/docx/":         true,
+		"/depth/declaredType/": true,
+		"/depth/md/":           true,
+		"/depth/html/":         true,
+		"/depth/json/":         true,
+		"/depth/xml/":          true,
+		"/depth/csv/":          true,
 		// JavaScript test: same depth lines, written in by a script.
-		"/depthjsinlinepage/": true,
-		"/depthjsextpage/":    true,
-		"/depthjsdatapage/":   true,
-		"/depthjsldpage/":     true,
-		"/depthjsfile/":       true,
+		"/depth/jsInline/":         true,
+		"/depth/jsExternal/":       true,
+		"/depth/jsData/":           true,
+		"/depth/jsonLd/":           true,
+		"/depth/jsExternalScript/": true,
 		// The changeable page: the depth HTML/text page with versioned codes.
-		"/verhtmlpage/": true,
-		"/vertxtpage/":  true,
+		"/correction/html/": true,
+		"/correction/txt/":  true,
 		// The healable page: broken until the control fixes it, then the depth HTML page.
-		"/healpage/": true,
+		"/heal/": true,
 	}
 	got := map[string]bool{}
 	for _, p := range genPageRoutes {
@@ -163,7 +164,7 @@ func TestServeGeneratedFallsThrough(t *testing.T) {
 // The secret gate lives in the shared spine: every route needs a secret and
 // answers 503 without one.
 func TestServeGeneratedSecretGate(t *testing.T) {
-	for _, path := range []string{"/depthhtmlpage/id/2048", "/depthjsonpage/x/2048", "/depthpdfpage/x/2048", "/ccdepthpage/none/tag/x/2048"} {
+	for _, path := range []string{"/depth/html/id/2048", "/depth/json/x/2048", "/depth/pdf/x/2048", "/cacheHeaders/none/tag/x/2048"} {
 		s := newStaticServer(t.TempDir(), "") // no secret set
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, path, nil)
@@ -172,6 +173,24 @@ func TestServeGeneratedSecretGate(t *testing.T) {
 		}
 		if code := w.Result().StatusCode; code != http.StatusServiceUnavailable {
 			t.Errorf("%s without a secret: status = %d, want 503", path, code)
+		}
+	}
+}
+
+// No file or folder in site/ may share the first part of a page address, or a
+// real file could hide the generated page.
+func TestNoSiteFileShadowsAPageAddress(t *testing.T) {
+	entries, err := os.ReadDir("../site")
+	if err != nil {
+		t.Fatalf("read site: %v", err)
+	}
+	for _, p := range genPageRoutes {
+		first := strings.ToLower(strings.Split(strings.Trim(p.prefix(), "/"), "/")[0])
+		for _, e := range entries {
+			name := strings.ToLower(e.Name())
+			if name == first || strings.HasPrefix(name, first+".") {
+				t.Errorf("site/%s would shadow the %s pages", e.Name(), p.prefix())
+			}
 		}
 	}
 }

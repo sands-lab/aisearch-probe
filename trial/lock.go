@@ -68,7 +68,7 @@ const contentReuseLockPath = "logs/.content-reuse.lock"
 
 // The correction run's ticks take a SEPARATE lock per sitting (correctionLockFor
 // in correctionrun.go, next to the sitting's state file): they touch only their own
-// changeable pages (/verhtmlpage/, /vertxtpage/), never probe-site/, so they must
+// changeable pages (/correction/html/, /correction/txt/), never probe-site/, so they must
 // not grab runLockPath, and sittings started on different days must not block
 // each other. The lock stops two ticks firing the same sitting's step twice.
 

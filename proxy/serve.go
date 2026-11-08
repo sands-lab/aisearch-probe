@@ -32,7 +32,7 @@ type staticServer struct {
 	controlSecret string
 
 	// versions is the changeable page's per-id current version, set through
-	// POST /control/version (same controlSecret). Memory-only unless main points
+	// POST /control/correction (same controlSecret). Memory-only unless main points
 	// it at a state file. See verpage.go.
 	versions *versionState
 
@@ -124,7 +124,7 @@ func (s *staticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Generated pages live at a per-run address that has never been fetched before
 	// — the robots.txt experiments need that. Each route (/page/, /cpage/,
-	// /sizepage/, /depthpage/, /ccdepthpage/, …) is a genPage; serveGenerated runs
+	// /sizepage/, /depthpage/, /cacheHeaders/, …) is a genPage; serveGenerated runs
 	// the shared spine and returns true once it has handled the request. They are
 	// SEPARATE routes on purpose: /page/'s bytes (which the retention run depends
 	// on) stay untouched by the others. See genpage.go.

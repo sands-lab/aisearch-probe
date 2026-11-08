@@ -184,7 +184,7 @@ const checkPageSize = 2048
 
 // checkPageURL is a fresh 2 KB depth page on base for one check.
 func checkPageURL(base, id string) string {
-	return strings.TrimRight(base, "/") + "/depthhtmlpage/" + id + "/" + fmt.Sprint(checkPageSize)
+	return strings.TrimRight(base, "/") + "/depth/html/" + id + "/" + fmt.Sprint(checkPageSize)
 }
 
 // checkPageTarget is the page -checkPage downloads and the code its top must

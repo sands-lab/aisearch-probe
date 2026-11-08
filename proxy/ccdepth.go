@@ -9,10 +9,10 @@ import (
 	"aisearch-probe/internal/probe"
 )
 
-// /ccdepthpage/<setting>/<validators>/<id>/<bytes> — THE CACHE-HEADER TEST.
+// /cacheHeaders/<setting>/<validators>/<id>/<bytes> — THE CACHE-HEADER TEST.
 //
 // Does a vendor's fetch cache obey the caching headers a site sends? This route
-// serves the SHARED depth content — byte-for-byte the /depthhtmlpage/ body for the
+// serves the SHARED depth content — byte-for-byte the /depth/html/ body for the
 // same id and size, the one content definition every experiment uses — under a
 // caching-header setting chosen by two words in the address:
 //
@@ -30,7 +30,7 @@ import (
 // every other route returns pageHeaders{} and a test enforces it. The grading rule
 // (what RFC 9111 allows a shared cache for each setting) is probe.SharedReuseLimit.
 
-const ccDepthPrefix = "/ccdepthpage/"
+const ccDepthPrefix = "/cacheHeaders/"
 
 type ccDepthRoute struct{}
 
@@ -74,7 +74,7 @@ func (ccDepthRoute) build(s *staticServer, w http.ResponseWriter, r *http.Reques
 		http.Error(w, fmt.Sprintf("depth page too small: %d bytes cannot hold the markers", nbytes), http.StatusBadRequest)
 		return nil, "", "", pageHeaders{}, false
 	}
-	// The same bytes /depthhtmlpage/<id>/<bytes> serves: only the headers differ.
+	// The same bytes /depth/html/<id>/<bytes> serves: only the headers differ.
 	body := renderDepthHTML(depthFormatLines(s.pageCodeSecret, id, nbytes))
 	return body, "depth.html", "text/html; charset=utf-8", hdr, true
 }

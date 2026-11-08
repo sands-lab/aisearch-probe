@@ -22,7 +22,7 @@ import (
 // does a vendor keep answering "it's broken"? (doc/handoff-cacheheader-day2-and-heal.md
 // Part 2; design agreed 2026-10-22.)
 //
-// Each trial is one fresh healable page (/healpage/, proxy/healpage.go) for ONE
+// Each trial is one fresh healable page (/heal/, proxy/healpage.go) for ONE
 // check time and ONE failure, asked about by one vendor:
 //
 //	1. at its (shuffled) first-ask slot, create the page BROKEN with its failure
@@ -284,7 +284,7 @@ func buildHealPages(provs []Caller, base, runID string, lay healLayout) ([]*Heal
 }
 
 // healPagePrefixClient is the origin's healable-page route (proxy/healpage.go).
-const healPagePrefixClient = "/healpage/"
+const healPagePrefixClient = "/heal/"
 
 func healLockFor(statePath string) string {
 	return filepath.Join(filepath.Dir(statePath), "."+filepath.Base(statePath)+".lock")
@@ -763,7 +763,7 @@ func runHealTick(provs []Caller, statePath, secret, controlSecret string, loop b
 		fmt.Fprintln(os.Stderr, "error: needs -pageCodeSecret and -controlSecret (both must match the origin)")
 		return 1
 	}
-	lock, err := acquireRunLock(healLockFor(statePath), "remembered-failure run tick", []string{"healable pages (/healpage/) of " + statePath})
+	lock, err := acquireRunLock(healLockFor(statePath), "remembered-failure run tick", []string{"healable pages (/heal/) of " + statePath})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[heal] tick skipped — lock held: %v\n", err)
 		return 0

@@ -23,7 +23,7 @@ import (
 // (doc/handoff-changeable-page.md; plan items 3 "visibility of a page correction"
 // and 8 "content type vs update".)
 //
-// Each trial is one fresh changeable page (/verhtmlpage/ or /vertxtpage/, see
+// Each trial is one fresh changeable page (/correction/html/ or /correction/txt/, see
 // proxy/verpage.go) for ONE check time, asked about by one vendor:
 //
 //	1. at its (randomised) warm-up time, set the page to version 1 (A) through the
@@ -76,7 +76,7 @@ const (
 )
 
 // verRoutePrefix maps a format to the changeable page's route.
-var verRoutePrefix = map[string]string{"html": "/verhtmlpage/", "txt": "/vertxtpage/"}
+var verRoutePrefix = map[string]string{"html": "/correction/html/", "txt": "/correction/txt/"}
 
 // CorrectionAsk is one question to one page.
 type CorrectionAsk struct {
@@ -683,7 +683,7 @@ func postVersion(localOrigin, secret string, size int) func(id string, version i
 	client := &http.Client{Timeout: 30 * time.Second}
 	return func(id string, version int) (versionReply, error) {
 		form := url.Values{"id": {id}, "version": {strconv.Itoa(version)}, "size": {strconv.Itoa(size)}}
-		req, err := http.NewRequest(http.MethodPost, strings.TrimRight(localOrigin, "/")+"/control/version", strings.NewReader(form.Encode()))
+		req, err := http.NewRequest(http.MethodPost, strings.TrimRight(localOrigin, "/")+"/control/correction", strings.NewReader(form.Encode()))
 		if err != nil {
 			return versionReply{}, err
 		}
@@ -864,7 +864,7 @@ func runCorrectionTick(provs []Caller, statePath, secret, controlSecret string, 
 		fmt.Fprintln(os.Stderr, "error: needs -pageCodeSecret and -controlSecret (both must match the origin)")
 		return 1
 	}
-	lock, err := acquireRunLock(correctionLockFor(statePath), "correction run tick", []string{"changeable pages (/verhtmlpage/, /vertxtpage/) of " + statePath})
+	lock, err := acquireRunLock(correctionLockFor(statePath), "correction run tick", []string{"changeable pages (/correction/html/, /correction/txt/) of " + statePath})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[correction] tick skipped — lock held: %v\n", err)
 		return 0

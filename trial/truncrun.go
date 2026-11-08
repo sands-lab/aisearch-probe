@@ -121,7 +121,7 @@ type TruncAction struct {
 // (provider, size); Part B a warm+reask pair per (provider, size) on its OWN page.
 // The size is in the path and the page id is unique per (provider, run, part, size).
 // routePrefix is the generated-page route to hit (default "/depthpage/"); the format
-// variants (/depthtxtpage/, /depthpdfpage/, /depthdocxpage/) serve the same markers
+// variants (/depth/txt/, /depth/pdf/, /depth/docx/) serve the same markers
 // in another format. partAOnly builds only the "scan" (cut-locating) ask and skips
 // the Part B warm+reask — the cheap read-depth smoke that avoids Part B's cost.
 func buildTruncActions(provs []Caller, base, runID string, sizes []int, reps int, routePrefix string) []*TruncAction {
@@ -129,7 +129,7 @@ func buildTruncActions(provs []Caller, base, runID string, sizes []int, reps int
 		reps = 1
 	}
 	if routePrefix == "" {
-		routePrefix = "/depthhtmlpage/"
+		routePrefix = "/depth/html/"
 	}
 	mkURL := func(id string, n int) string {
 		return strings.TrimRight(base, "/") + routePrefix + id + "/" + strconv.Itoa(n)

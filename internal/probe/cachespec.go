@@ -10,7 +10,7 @@ import (
 
 // The cache-header test, stated once.
 //
-// /ccdepthpage/<setting>/<validators>/<id>/<bytes> serves the shared depth content
+// /cacheHeaders/<setting>/<validators>/<id>/<bytes> serves the shared depth content
 // under one response-header setting. These tables are the ONLY place a test cache
 // setting is defined: the proxy serves from them, the trial runner builds its pages
 // and grades its results from them. Every other generated page sends no

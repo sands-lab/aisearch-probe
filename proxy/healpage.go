@@ -28,14 +28,14 @@ import (
 //
 // THE FAILURE IS SERVER STATE, NEVER IN THE ADDRESS. The control creates each id with
 // one failure — 503, 404 or 403 — and every page has the same address shape,
-// /healpage/<id>/<bytes>, so the fetcher cannot tell from the URL which failure it
+// /heal/<id>/<bytes>, so the fetcher cannot tell from the URL which failure it
 // will get. A broken page sends that status with the standard reason phrase as its
 // body (RFC 9110 leaves an error body to the server; the reason phrase is what most
 // servers print) and no ETag, Last-Modified, Cache-Control or Expires, like every
 // fault page: nothing a cache could store or revalidate by.
 //
 // THE FIXED PAGE IS THE DEPTH PAGE. Once fixed, the address serves byte for byte what
-// /depthhtmlpage/<id>/<bytes> serves — one content definition everywhere, as the
+// /depth/html/<id>/<bytes> serves — one content definition everywhere, as the
 // changeable page's version 1 is the depth page. Its codes are unique to the page
 // because every run uses a fresh id. Last-Modified is the flip time (a fixed date
 // could answer a date-only revalidation with a 304 for a page that never had a 200);
@@ -54,7 +54,7 @@ import (
 // empty start; a file that cannot be read is a start-up error.
 
 const (
-	healPagePrefix  = "/healpage/"
+	healPagePrefix  = "/heal/"
 	controlHealPath = "/control/heal"
 	healStateFormat = 1
 	// defaultHealPageBytes is the size the control reports the fixed page's ETag

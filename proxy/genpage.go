@@ -28,7 +28,7 @@ import (
 // pageHeaders is the caching headers a route asks for. The ZERO VALUE is the
 // normal page every experiment serves: no Cache-Control, no Expires, an ETag, and
 // Last-Modified = probe.PageLastModified. Only the cache-header test
-// (/ccdepthpage/) may return anything else — a test setting must never leak into
+// (/cacheHeaders/) may return anything else — a test setting must never leak into
 // another experiment's pages (DECISIONS.md § D13), and
 // TestOnlyTheCacheTestRouteChoosesCacheHeaders enforces it.
 type pageHeaders struct {

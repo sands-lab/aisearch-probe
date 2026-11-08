@@ -30,7 +30,7 @@ import (
 //
 // THE PAGE AND THE PROOF (redo of 2026-10-11)
 //
-// Each run makes two brand-new 2 KB depth pages (/depthhtmlpage/<id>/2048, the
+// Each run makes two brand-new 2 KB depth pages (/depth/html/<id>/2048, the
 // page the cache-control and fault runs use): the shared page and the control.
 // Every answer is matched against that page's OWN code, recomputed here from the
 // page-code secret — never the shared RCP marker, which is the same on every page
@@ -142,7 +142,7 @@ type sharingPlanStep struct {
 }
 
 func sharingPageURL(base, id string) string {
-	return fmt.Sprintf("%s/depthhtmlpage/%s/%d", strings.TrimRight(base, "/"), id, sharingPageBytes)
+	return fmt.Sprintf("%s/depth/html/%s/%d", strings.TrimRight(base, "/"), id, sharingPageBytes)
 }
 
 // buildSharingPlan lays out the four asks on two fresh pages named by the run id.
@@ -446,7 +446,7 @@ func askOnceTimeout(n int, label string, p Caller, url, question, want string, f
 }
 
 // samePage reports whether a request path is for the page at pageURL in ANY of
-// its variants: every address under the page's id (/depthhtmlpage/<id>/...) carries
+// its variants: every address under the page's id (/depth/html/<id>/...) carries
 // the same codes, whatever the size, so fetching /4096 instead of /2048 is still
 // a download of this page. Matching the exact path let such a fetch read as "no
 // download" (Mistral's web app tried /4096 … /1048576 on 2026-10-11). The control
@@ -457,7 +457,7 @@ func samePage(reqPath, pageURL string) bool {
 	if i <= 0 {
 		return reqPath == p
 	}
-	dir := p[:i] // /depthhtmlpage/<id>
+	dir := p[:i] // /depth/html/<id>
 	return reqPath == dir || strings.HasPrefix(reqPath, dir+"/")
 }
 

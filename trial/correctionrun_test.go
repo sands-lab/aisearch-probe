@@ -13,7 +13,7 @@ import (
 // THE CORRECTION RUN (doc/handoff-changeable-page.md; plan items 3 and 8), runner
 // side. Spec pinned here before the code:
 //   - ONE FRESH PAGE PER CHECK TIME, per (vendor, format, trial), on the changeable
-//     page (/verhtmlpage/ or /vertxtpage/): warmed once, switched once, asked again
+//     page (/correction/html/ or /correction/txt/): warmed once, switched once, asked again
 //     once — so no check can disturb another (Moura et al. IMC 2019 / Schomp et al.
 //     IMC 2013 use one fresh name per probe for the same reason)
 //   - each warm-up starts at a random moment within the start spread, and each
@@ -123,7 +123,7 @@ func TestBuildCorrectionPages(t *testing.T) {
 			t.Errorf("duplicate page %s", p.PageID)
 		}
 		seen[p.PageID], seen[p.URL] = true, true
-		prefix := map[string]string{"html": "/verhtmlpage/", "txt": "/vertxtpage/"}[p.Format]
+		prefix := map[string]string{"html": "/correction/html/", "txt": "/correction/txt/"}[p.Format]
 		if want := "https://probe.example.org" + prefix + p.PageID + "/2048"; p.URL != want {
 			t.Errorf("url %q, want %q", p.URL, want)
 		}
@@ -516,20 +516,20 @@ func TestWarmWithoutCodeVoidsTrial(t *testing.T) {
 // Each logged request for the page is labelled by the tag we sent: A bytes, B
 // bytes, or "not modified". Our own probes, other hosts and other pages never count.
 func TestLabelFetches(t *testing.T) {
-	pg := &CorrectionPage{PageID: "pg-1", Path: "/verhtmlpage/pg-1/2048", ETagA: `"aaa"`, ETagB: `"bbb"`}
+	pg := &CorrectionPage{PageID: "pg-1", Path: "/correction/html/pg-1/2048", ETagA: `"aaa"`, ETagB: `"bbb"`}
 	rec := func(ts float64, url string, status int, tag, bot string) probe.Record {
 		return probe.Record{TSUnix: ts, URL: url, PageKey: strings.SplitN(strings.TrimPrefix(url, "https://probe.example.org"), "?", 2)[0],
 			StatusCode: status, ETagSent: tag, Bot: bot}
 	}
-	u := "https://probe.example.org/verhtmlpage/pg-1/2048"
+	u := "https://probe.example.org/correction/html/pg-1/2048"
 	recs := []probe.Record{
 		rec(100, u, 200, `"aaa"`, "ChatGPT-User"),
 		rec(200, u, 200, `"bbb"`, "ChatGPT-User"),
 		rec(300, u, 304, `"bbb"`, "ChatGPT-User"),
-		rec(400, u, 200, `"bbb"`, "probe-selfcheck"),                                    // our own
-		rec(500, "https://other.example.org/verhtmlpage/pg-1/2048", 200, `"bbb"`, "X"),  // other host
-		rec(600, "https://probe.example.org/verhtmlpage/pg-12/2048", 200, `"zzz"`, "X"), // other page
-		rec(700, u+"?x=1", 200, `"bbb"`, "Claude-User"),                                 // query kept as the same page
+		rec(400, u, 200, `"bbb"`, "probe-selfcheck"),                                        // our own
+		rec(500, "https://other.example.org/correction/html/pg-1/2048", 200, `"bbb"`, "X"),  // other host
+		rec(600, "https://probe.example.org/correction/html/pg-12/2048", 200, `"zzz"`, "X"), // other page
+		rec(700, u+"?x=1", 200, `"bbb"`, "Claude-User"),                                     // query kept as the same page
 	}
 	got := labelFetches(recs, pg, "probe.example.org")
 	var labels []string

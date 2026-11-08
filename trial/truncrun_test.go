@@ -22,7 +22,7 @@ func TestTruncActionsExpand(t *testing.T) {
 		if strings.Contains(a.URL, "?") {
 			t.Errorf("%s uses a query — a provider could strip it", a.URL)
 		}
-		want := "/depthhtmlpage/" + a.PageID + "/" + strconv.Itoa(a.Bytes)
+		want := "/depth/html/" + a.PageID + "/" + strconv.Itoa(a.Bytes)
 		if !strings.Contains(a.URL, want) {
 			t.Errorf("URL %q does not carry the size in the path (%q)", a.URL, want)
 		}

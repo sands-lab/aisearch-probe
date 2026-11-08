@@ -18,7 +18,7 @@ import (
 //     server state, never in the address, so the fetcher cannot read it off the URL
 //   - a broken page sends that status with the standard reason phrase as its body
 //     and NO ETag, Last-Modified, Cache-Control or Expires (like every fault page)
-//   - one flip makes it the 2 KB depth page, byte for byte /depthhtmlpage/ for the
+//   - one flip makes it the 2 KB depth page, byte for byte /depth/html/ for the
 //     same id, with Last-Modified = the flip time and otherwise normal headers
 //   - it can never go back to broken; an id never created is a plain 404
 //   - the control is secret-guarded; the state survives a restart (saved to a file)
@@ -99,7 +99,7 @@ func TestHealPageLifecycle(t *testing.T) {
 			st, clock := healServer(t, "")
 			srv, _, _ := newTestProxy(t, st, "")
 			id := "hp-" + c.fail
-			page := srv.URL + "/healpage/" + id + "/2048"
+			page := srv.URL + "/heal/" + id + "/2048"
 
 			// Never created: a plain 404, with Go's own wording, so it can never be
 			// mistaken for a created page that fails with 404.
@@ -130,7 +130,7 @@ func TestHealPageLifecycle(t *testing.T) {
 			// the flip time, otherwise the normal page.
 			resp = get(t, page, nil)
 			got := body(t, resp)
-			want := body(t, get(t, srv.URL+"/depthhtmlpage/"+id+"/2048", nil))
+			want := body(t, get(t, srv.URL+"/depth/html/"+id+"/2048", nil))
 			if resp.StatusCode != http.StatusOK || got != want {
 				t.Fatalf("healed: status %d; body equals the depth page: %v", resp.StatusCode, got == want)
 			}

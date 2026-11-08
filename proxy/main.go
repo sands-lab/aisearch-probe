@@ -35,13 +35,13 @@ var (
 	serveFlag        = flag.String("serveDir", "", "Serve pages from this directory instead of proxying (use instead of -proxyTo)")
 	ccFlag           = flag.String("cacheControl", "", "Cache-Control sent with the static probe-site/ pages (-serveDir mode only). Default: none, the normal page (DECISIONS.md § D13). Generated pages ignore it")
 	robotsSecretFlag = flag.String("controlSecret", os.Getenv("PROBE_CONTROL_SECRET"),
-		"Password for the page controls, POST /control/version and /control/heal (-serveDir mode only; empty = controls disabled)")
+		"Password for the page controls, POST /control/correction and /control/heal (-serveDir mode only; empty = controls disabled)")
 	pageCodeSecretFlag = flag.String("pageCodeSecret", os.Getenv("PROBE_PAGE_CODE_SECRET"),
 		"Secret key for the unforgeable per-page codes on /cpage/ (-serveDir mode only; empty = /cpage/ route disabled)")
 	versionStateFlag = flag.String("correction-serverStateFile", "logs/verpage-state.json",
-		"File holding each changeable page's current version (/verhtmlpage/, /vertxtpage/), so a restart keeps it (-serveDir mode only; missing = empty start; \"\" = memory only)")
+		"File holding each changeable page's current version (/correction/html/, /correction/txt/), so a restart keeps it (-serveDir mode only; missing = empty start; \"\" = memory only)")
 	healStateFlag = flag.String("heal-serverStateFile", "logs/heal-state.json",
-		"File holding each healable page's state (/healpage/: broken with which failure, or fixed and when), so a restart keeps it (-serveDir mode only; missing = empty start; \"\" = memory only)")
+		"File holding each healable page's state (/heal/: broken with which failure, or fixed and when), so a restart keeps it (-serveDir mode only; missing = empty start; \"\" = memory only)")
 )
 
 func newStderrLogger() *log.Logger { return log.New(os.Stderr, "[upstream] ", 0) }

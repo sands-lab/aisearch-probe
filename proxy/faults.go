@@ -117,7 +117,7 @@ const faultStudyLine = "study reference RCP-2026-08"
 
 // faultDepthPage is the body a content-ending fault serves: its own label, the
 // study line, then the line-based depth page keyed on id — all rendered as HTML
-// by renderDepthHTML, the same renderer and size as /ccdepthpage/ (the cache-
+// by renderDepthHTML, the same renderer and size as /cacheHeaders/ (the cache-
 // header test), so the setup is uniform across experiments.
 func faultDepthPage(secret, id, label string) []byte {
 	lines := append([]string{label, faultStudyLine}, depthFormatLines(secret, id, faultDepthBytes)...)
@@ -138,7 +138,7 @@ func (s *staticServer) faultSecretMissing(w http.ResponseWriter) bool {
 }
 
 // faultDepthType is the Content-Type of a content-ending fault's body — the same
-// as /ccdepthpage/ sends.
+// as /cacheHeaders/ sends.
 const faultDepthType = "text/html; charset=utf-8"
 
 // writeFaultDepth serves a content-ending fault's 200. Written by hand, never via

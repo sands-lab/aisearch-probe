@@ -18,8 +18,8 @@ import (
 // version 2 (B), for the correction-visibility and type-vs-correction tests
 // (doc/handoff-changeable-page.md; plan items 3 and 8).
 //
-// IT IS THE DEPTH PAGE, NOT A NEW PAGE. /verhtmlpage/<id>/<bytes> and
-// /vertxtpage/<id>/<bytes> serve exactly what /depthhtmlpage/ and /depthtxtpage/
+// IT IS THE DEPTH PAGE, NOT A NEW PAGE. /correction/html/<id>/<bytes> and
+// /correction/txt/<id>/<bytes> serve exactly what /depth/html/ and /depth/txt/
 // serve — same generator, same five markers at the same depths — except that the
 // codes are made at the page's CURRENT VERSION instead of the fixed
 // probe.DepthPageRevision. probe.DepthCode already takes a revision, so version 1
@@ -28,7 +28,7 @@ import (
 //
 // THE VERSION IS SERVER STATE, NEVER IN THE REQUEST. The fetcher asks for the
 // same address before and after; the server answers with whatever version the
-// control last set for that id. POST /control/version (guarded by the same
+// control last set for that id. POST /control/correction (guarded by the same
 // control secret as /control/robots) sets it. An id the control never set is a
 // 404, so a typo — or a page lost to a restart — is visible, never a silent
 // version 1.
@@ -47,9 +47,9 @@ import (
 // empty start.
 
 const (
-	verHTMLPrefix      = "/verhtmlpage/"
-	verTxtPrefix       = "/vertxtpage/"
-	controlVersionPath = "/control/version"
+	verHTMLPrefix      = "/correction/html/"
+	verTxtPrefix       = "/correction/txt/"
+	controlVersionPath = "/control/correction"
 
 	// maxPageVersion bounds what the control accepts. The tests use 1 and 2; a
 	// single digit leaves room for a second correction without inviting typos.
@@ -237,7 +237,7 @@ func (v verRoute) build(s *staticServer, w http.ResponseWriter, r *http.Request)
 
 // --- the control ----------------------------------------------------------------
 
-// versionControlReply is what POST /control/version returns: the state it set,
+// versionControlReply is what POST /control/correction returns: the state it set,
 // plus the ETag every version serves in each format at the given size. The runner
 // keeps the tags so each logged fetch (probe.jsonl etag_sent) can be labelled as
 // version 1 or 2 without our own fetch of the page.
@@ -254,7 +254,7 @@ type versionControlReply struct {
 // request; with no control secret configured it returns false, so the caller
 // 404s it like any unknown path.
 //
-//	POST /control/version   id=<page id>
+//	POST /control/correction   id=<page id>
 //	                        version=<1..9>
 //	                        size=<bytes>        (optional; which size's tags to report, default 2048)
 //	                        secret=<secret>     (or header X-Probe-Control-Secret)

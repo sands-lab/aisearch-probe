@@ -219,7 +219,7 @@ func TestSharingPlanUsesPerPageCodesAndAlwaysHasAControl(t *testing.T) {
 	warm, ask, ctl, late := plan[0], plan[1], plan[2], plan[3]
 
 	for _, s := range plan {
-		if !strings.HasPrefix(s.url, "https://h.test/depthhtmlpage/") || !strings.HasSuffix(s.url, "/2048") {
+		if !strings.HasPrefix(s.url, "https://h.test/depth/html/") || !strings.HasSuffix(s.url, "/2048") {
 			t.Errorf("%s: not the 2 KB depth page: %s", s.label, s.url)
 		}
 		want := probe.DepthCode(secret, s.id, s.wantDepth, probe.DepthPageRevision)
@@ -259,16 +259,16 @@ func TestSharingPlanUsesPerPageCodesAndAlwaysHasAControl(t *testing.T) {
 // page, a saved answer could explain B's silence — that try cannot count.
 func TestCodeSeenEarlier(t *testing.T) {
 	prev := []SharingStep{
-		{URL: "https://h.test/depthhtmlpage/x/2048", Answer: "id: TRUNC-aaaa, ref: TRUNC-bbbb"},
-		{URL: "https://h.test/depthhtmlpage/ctl/2048", Answer: "TRUNC-cccc"},
+		{URL: "https://h.test/depth/html/x/2048", Answer: "id: TRUNC-aaaa, ref: TRUNC-bbbb"},
+		{URL: "https://h.test/depth/html/ctl/2048", Answer: "TRUNC-cccc"},
 	}
-	if !codeSeenEarlier(prev, "https://h.test/depthhtmlpage/x/2048", "trunc-AAAA") {
+	if !codeSeenEarlier(prev, "https://h.test/depth/html/x/2048", "trunc-AAAA") {
 		t.Error("a code already quoted for this page must be caught (case-insensitive)")
 	}
-	if codeSeenEarlier(prev, "https://h.test/depthhtmlpage/x/2048", "TRUNC-cccc") {
+	if codeSeenEarlier(prev, "https://h.test/depth/html/x/2048", "TRUNC-cccc") {
 		t.Error("a code quoted for a DIFFERENT page does not count")
 	}
-	if codeSeenEarlier(prev, "https://h.test/depthhtmlpage/x/2048", "") {
+	if codeSeenEarlier(prev, "https://h.test/depth/html/x/2048", "") {
 		t.Error("an empty code must never match")
 	}
 }
@@ -372,7 +372,7 @@ func TestWithControlGapMovesOnlyTheControl(t *testing.T) {
 // matters most: a refusal and a reused copy can both mean "no download".
 func TestSharingStepKeepsProviderFetchStatus(t *testing.T) {
 	p := Caller{Name: "google", Model: "gemini-2.5-flash"}
-	const url = "https://h.test/depthhtmlpage/x/2048"
+	const url = "https://h.test/depth/html/x/2048"
 	ok := probe.Usage{FetchStatus: "URL_RETRIEVAL_STATUS_SUCCESS " + url}
 	st := sharingStepFromAsk(2, "2: ask", p, url, "q", "TRUNC-abc", time.Unix(100, 0), "TRUNC-abc", ok, nil)
 	if st.FetchStatus != ok.FetchStatus || !st.Marker || st.Error != "" {

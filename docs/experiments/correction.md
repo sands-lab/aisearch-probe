@@ -1,31 +1,32 @@
 # Correction: when does an answer show a changed page?
 
 **The question.** A site owner corrects a page at the same address. How long until each AI
-service fetches the corrected page, and how long until its answers show it? The run keeps
-"fetched the correction but still answered the old version" apart from ordinary reuse of an
-old copy. HTML and plain-text pages run side by side, to see whether the file type matters.
+service fetches the corrected page, and how long until its answers show it?
 
 ## How it works
 
 - **One address, two versions.** `/correction/html/<id>/2048` and `/correction/txt/<id>/2048`
-  serve the 2 KB depth page: five codes at 0, 25, 50, 75 and 95% down the page. The codes are
-  made from the page's current version. Version 2's codes did not exist before the switch, so a
-  version-2 code in an answer proves the model had the new page; a version-1 code after the
-  switch means the answer was out of date.
-- **The version is server state.** `POST /control/correction` (needs the control password) sets
-  which version an address serves. The request and the question are the same before and after.
-- **`Last-Modified` moves to the switch time**, so a date-only "has this changed?" gets the right
-  answer. No `Cache-Control`, like every page except the cache-header test.
+  serve the 2 KB depth page: five codes at 0, 25, 50, 75 and 95% down the page. Each version
+  has its own set of codes, so the code in an answer shows which version the model had.
+- **Switching versions.** The runner switches the version through the server's control address,
+  `POST /control/correction`.
+- **`Last-Modified`** is set to the switch time.
 - **Which version each fetch got** is read from the server log (`etag_sent`).
 - **Schedule, per page:** ask once (the first ask names the 95% code) → 5 minutes after that
   answer comes back, switch to version 2 → ask again once at the page's check time (naming the
-  50% code). One fresh page per vendor, format and check time, so no page is asked twice after
-  the switch. Each check time is drawn at random inside its own step of a times-2 grid, so checks
-  never fall into step with anything the vendor does on a timer.
+  50% code). Each page is used once: one new page for every vendor, file type and wait.
+- **When to ask again.** You choose how long after the switch the second question is asked,
+  with `-correction-askAgainTimes` (for example 15 min, 30 min, 1 h, 2 h). The runner adds
+  random jitter to each of these times (`-correction-jitter`, on by default).
 
 ## Run it
 
-1. Plan a sitting. No API call; writes the state file.
+A run has three commands. The first only writes a schedule, the second carries it out over hours
+or days, and the third reads the results.
+
+1. **Make the schedule.** This picks one new page address for every vendor, file type and wait,
+   and works out when each question and each version switch is due. It writes all of that to a
+   state file. It sends no questions and costs nothing.
 
    ```
    ./bin/probe-trial -correction-plan -correction-stateFile logs/correction-s1.state.json \
@@ -34,26 +35,31 @@ old copy. HTML and plain-text pages run side by side, to see whether the file ty
        [-correction-startAt 2026-12-01T10:00Z]
    ```
 
-   Direct setup only: add `-correction-controlUrl https://<your domain>` (see
-   [setup-direct.md](../setup-direct.md)). Behind a CDN, the default `http://localhost:8899` is
-   right when the runner runs on the server machine.
+   The runner switches pages through the server's control address, `-correction-controlUrl`
+   (default `http://localhost:8899`). Behind a CDN, run the runner on the server machine and
+   keep the default. Direct setup: add `-correction-controlUrl https://<your domain>`.
 
-2. Run the steps until every page is done. Either keep a loop running (in `tmux` or similar):
+2. **Carry out the schedule.** This sets each page up on the server, asks the first questions,
+   switches each page to version 2 and asks the second questions, each at its due time, reading
+   and updating the state file as it goes. With the longest wait of 64 hours, that takes about three days. Keep it running in
+   `tmux` or similar; it stops by itself when every page is done:
 
    ```
    ./bin/probe-trial -correction-loop -correction-stateFile logs/correction-s1.state.json
    ```
 
-   or call `-correction-step` from cron: it does what is due, then exits.
+   If you prefer cron, call `-correction-step` instead: each call does whatever is due right
+   now, then exits.
 
-3. Report, once the last check has passed:
+3. **Read the results**, after the last second question:
 
    ```
    ./bin/probe-trial -correction-report -correction-stateFile logs/correction-s1.state.json \
        -serverLog logs/probe.jsonl
    ```
 
-Repeats come from separate sittings on different days and times, each with its own state file.
+To repeat the experiment, make a new schedule with a new state file (for example
+`correction-s2`) on another day or at another time.
 
 | Switch | What it does |
 |---|---|
@@ -74,12 +80,12 @@ old version without fetching, or fetched the new version and still answered with
 
 ## Figure
 
-Name each sitting's state file `correction-<RUN>.state.json` in one folder, then:
+Run this once, after "Read the results", listing every run you made. A run's name is the part of
+its state file name between `correction-` and `.state.json` (`s1` for
+`logs/correction-s1.state.json`):
 
 ```
-python3 scripts/correction_plot.py --logs logs --origin A=logs/probe.jsonl=My\ server \
-    --out figures A:s1:new A:s2:new A:s3:new
+python3 scripts/correction_plot.py --state-dir logs --server-log logs/probe.jsonl --out figures s1 s2 s3
 ```
 
-Each run is given as `SERVER:RUN:PROMPT`; `PROMPT` is `new` for runs made with this code (the
-address and the question only). `--origin` can be given once per server when you ran on two.
+The figures are saved in `figures/`.

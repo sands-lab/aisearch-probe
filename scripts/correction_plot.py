@@ -15,13 +15,11 @@ the same rules as `probe-trial -correction-report`: only requests that arrived b
 sending the question and the answer coming back count, and the version a request got is
 read from the fingerprint tag we sent. Read each server's log after its runs have ended.
 
-Usage: correction_plot.py --logs <dir with correction-<RUN>.state.json>
-                          --origin A=<server log>[=<panel title>] [--origin B=...]
-                          --out <figure dir> A:<run>:old A:<run>:new ...
-Each --origin names one server (a short label, its request log, and an optional title).
-Each run is ORIGIN:RUN:PROMPT: ORIGIN is one of the --origin labels, RUN names the state file
-correction-<RUN>.state.json (write it with -correction-stateFile), and PROMPT is old (wrapper) or
-new (address + question only).
+Usage (one server):
+  correction_plot.py --state-dir logs --server-log logs/probe.jsonl --out figures s1 s2 s3
+A run name is the part of its state file name between "correction-" and ".state.json".
+Two or more servers: replace --server-log with one --origin LABEL=SERVER_LOG[=TITLE] per server,
+and name each run LABEL:RUN.
 """
 import argparse
 import json
@@ -59,10 +57,19 @@ STYLE = {
 }
 
 
+def mixed_prompts(runs):
+    """True when old-prompt runs (the original study's data) are in the figure."""
+    return any(r["prompt"] == "old" for r in runs)
+
+
 def parse_run(spec):
-    origin, run, prompt = spec.split(":")
-    if origin not in ORIGIN_LOG or prompt not in PROMPT_NAME:
-        raise SystemExit(f"bad run {spec!r}: want <origin label>:<run>:old|new, origin one of {sorted(ORIGIN_LOG)}")
+    parts = spec.split(":")
+    if len(parts) == 1 and len(ORIGIN_LOG) == 1:
+        parts = [next(iter(ORIGIN_LOG)), spec]  # one server: a bare run name
+    origin, run = parts[0], parts[1] if len(parts) > 1 else ""
+    prompt = parts[2] if len(parts) == 3 else "new"
+    if len(parts) not in (2, 3) or origin not in ORIGIN_LOG or prompt not in PROMPT_NAME:
+        raise SystemExit(f"bad run {spec!r}: want <origin label>:<run>[:old|new], origin one of {sorted(ORIGIN_LOG)}")
     return dict(origin=origin, run=run, prompt=prompt)
 
 
@@ -164,7 +171,7 @@ def plot_timeline(rows, runs, out):
         # Lane key, right of the top row: which run, which prompt.
         top = len(ROWS) - 1
         for i, r in enumerate(mine):
-            ax.text(1.01, (top + lane[r["run"]] + 0.6) / len(ROWS), f"run {i + 1} · {PROMPT_NAME[r['prompt']]}",
+            ax.text(1.01, (top + lane[r["run"]] + 0.6) / len(ROWS), f"run {i + 1}" + (f" · {PROMPT_NAME[r['prompt']]}" if mixed_prompts(runs) else ""),
                     transform=ax.transAxes, va="center", ha="left", color=INK2, fontsize=7.5)
         ax.set_xlabel("Time from page update to follow-up query (log scale)", color=INK2, fontsize=9.5)
     axes[0][0].set_yticks(range(len(ROWS)))
@@ -209,7 +216,7 @@ def plot_fetched_but_old(rows, runs, out):
         ax.set_xlim(0, xmax * 1.3 + 2)
         ax.grid(axis="x", color=GRID, linewidth=0.8, zorder=0)
         runs_word = "run" if n == 1 else "runs"
-        ax.set_title(f"{ORIGIN_NAME[origin].split(' (')[0]} · {PROMPT_NAME[prompt]} ({n} {runs_word})",
+        ax.set_title(f"{ORIGIN_NAME[origin].split(' (')[0]}" + (f" · {PROMPT_NAME[prompt]}" if mixed_prompts(runs) else "") + f" ({n} {runs_word})",
                      loc="left", color=INK, fontsize=10, fontweight="bold", pad=6)
         ax.set_xlabel("Queries with a new origin request", color=INK2, fontsize=9)
     axes[0][0].set_yticks(range(len(ROWS)))
@@ -226,12 +233,19 @@ def plot_fetched_but_old(rows, runs, out):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--logs", required=True, help="folder holding correction-<RUN>.state.json")
-    ap.add_argument("--origin", action="append", required=True,
-                    help="LABEL=SERVER_LOG[=TITLE], e.g. A=logs/probe.jsonl='Origin A (behind a CDN)'")
+    ap.add_argument("--state-dir", "--logs", dest="logs", required=True,
+                    help="folder holding correction-<RUN>.state.json")
+    ap.add_argument("--server-log", help="your server's request log (one server)")
+    ap.add_argument("--origin", action="append", default=[],
+                    help="two or more servers: LABEL=SERVER_LOG[=TITLE], once per server")
     ap.add_argument("--out", required=True)
-    ap.add_argument("runs", nargs="+", help="ORIGIN:RUN:PROMPT, e.g. A:s1:old B:d1:new")
+    ap.add_argument("runs", nargs="+", help="run names, e.g. s1 s2; with --origin: LABEL:RUN")
     args = ap.parse_args()
+    if bool(args.server_log) == bool(args.origin):
+        raise SystemExit("give either --server-log (one server) or --origin (one per server)")
+    if args.server_log:
+        ORIGIN_LOG["A"] = args.server_log
+        ORIGIN_NAME["A"] = "Your server"
     for spec in args.origin:
         parts = spec.split("=", 2)
         if len(parts) < 2:

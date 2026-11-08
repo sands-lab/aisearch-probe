@@ -23,7 +23,12 @@ from the old error, and for how long?
 
 ## Run it
 
-1. Plan a sitting (no API call):
+A run has three commands. The first only writes a schedule, the second carries it out over hours,
+and the third reads the results.
+
+1. **Make the schedule.** This picks one new page address for every vendor, error code and wait,
+   and works out when each question is due and when each page comes back. It writes all of that
+   to a state file. It sends no questions and costs nothing.
 
    ```
    ./bin/probe-trial -heal-plan -heal-stateFile logs/heal-s1.state.json \
@@ -31,24 +36,33 @@ from the old error, and for how long?
        -vendors or:openai,anthropic,or:x-ai -anthropicModel claude-sonnet-5
    ```
 
-   Direct setup only: add `-heal-controlUrl https://<your domain>`. Behind a CDN, the default
-   `http://localhost:8899` is right when the runner runs on the server machine.
+   The runner takes pages out of service and back through the server's control address,
+   `-heal-controlUrl` (default `http://localhost:8899`). Behind a CDN, run the runner on the
+   server machine and keep the default. Direct setup: add `-heal-controlUrl https://<your domain>`.
 
-2. Run it. The loop sleeps until each step is due, checks the site only then, and exits when
-   every page has been asked again (run it in `tmux` or similar):
+2. **Carry out the schedule.** This puts each page on the server out of service, asks the first
+   question, brings the page back 5 minutes after the answer, and asks the second question, each
+   at its due time, reading and updating the state file as it goes. With the default waits (up to
+   about 11 hours) that takes about half a day. Keep it running in `tmux` or similar; it sleeps
+   between steps and stops by itself when every page is done:
 
    ```
    ./bin/probe-trial -heal-loop -heal-stateFile logs/heal-s1.state.json -siteUrl https://<your domain>
    ```
 
-   `-heal-step` instead does what is due now and exits, for cron.
+   If you prefer cron, call `-heal-step` instead: each call does whatever is due right now, then
+   exits.
 
-3. Report:
+3. **Read the results**, after the last second question. `-heal-reportFile` also writes every
+   page's result to a file, which the figure script reads:
 
    ```
    ./bin/probe-trial -heal-report -heal-stateFile logs/heal-s1.state.json \
        -heal-reportFile logs/heal-s1.results.json -serverLog logs/probe.jsonl
    ```
+
+To repeat the experiment, make a new schedule with a new state file (for example `heal-s2`) on
+another day or at another time.
 
 | Switch | What it does |
 |---|---|

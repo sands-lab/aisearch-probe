@@ -6,23 +6,25 @@ and reuse web pages.
 You run the server on a domain you control. The runner asks an AI service (OpenAI, Anthropic,
 xAI, Google, directly or through OpenRouter) a question about a fresh page on that server. The
 server log then shows which crawler downloaded the page, when, and with which headers. The
-answer shows what the model actually read.
+answer shows the result of both how the model read the page and the service's own processing
+of it on the way (text extraction, cutting long pages short, filtering).
 
-Each test page shows five short codes, such as `TRUNC-13de1433e2ee`, at 0, 25, 50, 75 and 95% of
-the way down the page. The server works each code out from the page's address and a secret key
-that only you know. Nobody without the key can guess a code, and every page has different ones.
-So when an answer quotes a code, the model must have read that exact page, and the deepest code it
-quotes shows how far down the page it read.
+To make a code that cannot be faked, the server takes the page's id, the code's position on the
+page and a secret key shared by the server and the runner, and runs them through a keyed hash
+(HMAC-SHA256). The result is a short code such as `TRUNC-13de1433e2ee`. Without the key nobody
+can produce it, so a code in an answer proves the page's text reached the model. Each page
+carries five such codes, placed at 0, 25, 50, 75 and 95% of the way down, and the deepest one an
+answer quotes shows how far into the page the model got.
 
 ## What it measures
 
 | Experiment | The question | Page |
 |---|---|---|
 | [Correction](docs/experiments/correction.md) | A page changes at the same address. When does the answer show the new version? | [docs/experiments/correction.md](docs/experiments/correction.md) |
-| [Fault recovery](docs/experiments/fault.md) | A page fails (error code, slow reply, cut-off body, redirect loop). Does the fetcher retry, and what does it cost? | [docs/experiments/fault.md](docs/experiments/fault.md) |
-| [Heal time](docs/experiments/heal.md) | A page fails, is fixed, and is asked about again. Does the service see the fix? | [docs/experiments/heal.md](docs/experiments/heal.md) |
+| [Fault recovery](docs/experiments/fault.md) | A page misbehaves (error code, slow reply, cut-off body, redirect loop). Does the fetcher retry, and what does it cost? | [docs/experiments/fault.md](docs/experiments/fault.md) |
+| [Heal time](docs/experiments/heal.md) | A page is out of service (answers with an error) for a short time, then comes back. Asked again later, does the service see that it is back? | [docs/experiments/heal.md](docs/experiments/heal.md) |
 | [Account sharing, API](docs/experiments/sharingApi.md) | Does one caller's stored copy get handed to another caller? | [docs/experiments/sharingApi.md](docs/experiments/sharingApi.md) |
-| [Account sharing, web app](docs/experiments/sharingWeb.md) | The same question for chat apps, with a person pasting the prompts | [docs/experiments/sharingWeb.md](docs/experiments/sharingWeb.md) |
+| [Account sharing, web app](docs/experiments/sharingWeb.md) | Does a chat app (ChatGPT, Claude, Gemini and others) hand a page one account downloaded to a different account? A person pastes the prompts | [docs/experiments/sharingWeb.md](docs/experiments/sharingWeb.md) |
 | [Cache headers](docs/experiments/cacheHeaders.md) | Does a service obey `Cache-Control`, `Expires` and similar headers? | [docs/experiments/cacheHeaders.md](docs/experiments/cacheHeaders.md) |
 | [Document type](docs/experiments/documentType.md) | Which file formats does each service read, and is the deciding factor the `Content-Type` header? | [docs/experiments/documentType.md](docs/experiments/documentType.md) |
 | [Read depth and token cost](docs/experiments/readDepth.md) | How far into a long page does each service read, and what does it bill? | [docs/experiments/readDepth.md](docs/experiments/readDepth.md) |
@@ -49,4 +51,5 @@ Start with [QUICKSTART.md](QUICKSTART.md).
 
 The filler text on the depth pages is Joseph Conrad's *Heart of Darkness* (1899), a public-domain
 book taken from Project Gutenberg with Project Gutenberg's header and licence footer removed.
-`scripts/depthPage_build.py --input <file>` rebuilds it from your own text.
+You can also bring your own text instead: `scripts/depthPage_build.py --input <your file>` builds
+the filler from it.

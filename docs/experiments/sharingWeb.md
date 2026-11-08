@@ -1,8 +1,9 @@
 # Account sharing, web app
 
-**The question.** The same question as the [API sharing test](sharingApi.md), for consumer chat
-apps: does a page one account's chat downloaded get served to a different account's chat? A
-person does the browsing; the helper tells them what to paste and reads the server log.
+**The question.** Does a chat app hand a page that one account's chat downloaded to a different
+account's chat? This is the [API sharing test](sharingApi.md) done in consumer chat apps
+(ChatGPT, Claude, Gemini and others). A person does the browsing; the helper tells them what to
+paste and reads the server log.
 
 ## How it works
 

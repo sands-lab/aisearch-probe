@@ -1,8 +1,9 @@
-# Heal time: does a service see that a failed page was fixed?
+# Heal time: does a service see that a page is back in service?
 
-**The question.** A page fails, the service answers that it is down, then the page is fixed and
-the same page is asked about again. Does the service go back and read the fixed page, or keep
-answering from the remembered failure, and for how long?
+**The question.** A page is out of service (it answers with an error) and the service, asked
+about it, says it is down. Five minutes later the page comes back. When the same page is asked
+about again later, does the service read it again and see that it is back, or keep answering
+from the old error, and for how long?
 
 ## How it works
 

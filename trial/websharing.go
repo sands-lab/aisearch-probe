@@ -28,9 +28,9 @@ import (
 // warm) account B asks each app's shared page, then each app's control page. The
 // waits overlap, so a sitting costs little more than the pasting.
 //
-// Storage: the replies go to the web-trial raw log (logs/web-trials/raw/<run>.jsonl,
-// phase "sharing", the standard record format), the steps to
-// logs/sharing-redo/web-<run>.jsonl, and the standard records with surface web-app.
+// Storage: the replies go to logs/sharingWeb/raw/<run>.jsonl, the steps to
+// logs/sharingWeb/web-<run>.jsonl, and the standard records (surface web-app) to
+// logs/results/sharing-<run>.jsonl.
 
 type webSharingConfig struct {
 	base, secret   string

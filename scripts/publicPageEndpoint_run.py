@@ -9,8 +9,8 @@ Every (vendor, anchor) is sampled on the SAME 45-min, 24/7 schedule, so vendors 
 - Safety: a running count of Anthropic's estimated spend stops Anthropic calls at --anthropic-cap
   (default $30); the other vendors keep going. Append-only log; one JSON line per call.
 
-This script does NOT start the poller (the wrapper does) and makes NO call under --dry.
-Keys from env (source ~/.config/probe-trial/env first): ANTHROPIC_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY.
+This script does NOT start the poller (start publicPageEndpoint_poll.py next to it) and makes NO call under --dry.
+Keys from the environment: ANTHROPIC_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY.
 Usage: publicPageEndpoint_run.py <out.jsonl> [--rounds 96] [--interval 2700] [--jitter 300]
                           [--anthropic-cap 30] [--max-content-tokens 8000] [--label lifetime] [--dry]
 """

@@ -8,7 +8,6 @@ Each was checked live on 2026-10-07.
 import json, re
 
 def _num(b):      return b.decode("utf-8", "replace").strip()
-def _osm(b):      m = re.search(rb"sequenceNumber=(\d+)", b); return m.group(1).decode() if m else None
 def _jpath(*path):
     def f(b):
         j = json.loads(b)
@@ -26,9 +25,6 @@ ANCHORS = [
     {"key": "drand",        "url": "https://api.drand.sh/public/latest",
      "extract": _jpath("round"), "tick": "30s",
      "question": "ONLY the value of the \"round\" field in the JSON"},
-    {"key": "osm_minute",   "url": "https://planet.openstreetmap.org/replication/minute/state.txt",
-     "extract": _osm, "tick": "60s",
-     "question": "ONLY the number after \"sequenceNumber=\" in the text"},
     {"key": "wikipedia_rcid","url": "https://en.wikipedia.org/w/api.php?action=query&list=recentchanges&rctype=edit&rclimit=1&rcprop=ids&format=json",
      "extract": _jpath("query", "recentchanges", 0, "rcid"), "tick": "sub-second",
      "question": "ONLY the \"rcid\" value of the first object in query.recentchanges"},

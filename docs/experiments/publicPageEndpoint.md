@@ -7,12 +7,12 @@ the site's `Cache-Control` make a difference? No server of your own is needed.
 ## How it works
 
 - `scripts/publicPageEndpoint_config.py` lists the endpoints and how to read each one's value.
-  Nine are used: `hn_maxitem`, `nist_beacon`, `drand`, `osm_minute`, `stackoverflow`,
+  Eight are used: `hn_maxitem`, `nist_beacon`, `drand`, `stackoverflow`,
   `crates_io`, `eth_height`, `btc_tip`, `usgs_quakes`. They cover the common `Cache-Control`
   stances (`no-cache`, `no-store`, `max-age`, none).
 - `scripts/publicPageEndpoint_run.py` asks each vendor to fetch an endpoint and return only its
   value, on the same schedule for every vendor (every 45 minutes, with a random offset, around the
-  clock). OpenAI, xAI and Google get all nine; Anthropic gets four, one per `Cache-Control`
+  clock). OpenAI, xAI and Google get all eight; Anthropic gets four, one per `Cache-Control`
   stance, and stops at a spending cap.
 - `scripts/publicPageEndpoint_poll.py` reads the live values every 5 minutes (no vendor calls),
   which dates the OpenAI, xAI and Google answers. Anthropic's reply carries the time it fetched the

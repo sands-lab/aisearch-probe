@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Box-plot figure for the 3-day public-endpoint lifetime run.
-Four panels (one per vendor), shared y = the 9 endpoints grouped by Cache-Control stance,
+Four panels (one per vendor), shared y = the 8 endpoints grouped by Cache-Control stance,
 x = staleness (hours behind live), symlog. Each box = that vendor x endpoint's ~80 samples.
 Anthropic dated by its own retrieved_at; the others by interpolation on the 5-min poll.
 Google x USGS is a known read-out bug -> blanked. Saves PNG + PDF.
@@ -72,8 +72,7 @@ BANDS = [
     ("reuse for a while",                [("crates_io","crates.io","max-age=15"),
                                          ("drand","drand","max-age=29"),
                                          ("usgs_quakes","USGS quakes","max-age=60")]),
-    ("no caching header",                [("osm_minute","OpenStreetMap","—"),
-                                         ("eth_height","Ethereum","—")]),
+    ("no caching header",                [("eth_height","Ethereum","—")]),
 ]
 INK, INK2, BAND = "#1a1a1a", "#4d4d4d", "#ececec"
 VEND = [("google","Google","#0B5FA5"), ("openai","OpenAI","#009E73"),

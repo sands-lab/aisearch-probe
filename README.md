@@ -16,6 +16,12 @@ can produce it, so a code in an answer proves the page's text reached the model.
 carries five such codes, placed at 0, 25, 50, 75 and 95% of the way down, and the deepest one an
 answer quotes shows how far into the page the model got.
 
+## The paper's data
+
+The data behind the paper's figures and tables is in a separate repo:
+<https://anonymous.4open.science/r/aisearch-data-9618/>. Put its `logs/` folder in this repo's top
+folder to redraw the figures. Its guides give the command for each one.
+
 ## What it measures
 
 | Experiment | The question | Page |

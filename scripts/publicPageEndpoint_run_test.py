@@ -35,10 +35,10 @@ def test_one_round_shape():
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f: out = f.name
     L.run(out, rounds=1, interval=0, jitter=0, cap=30.0, mct=8000, label="t", dry=False)
     recs = [r for r in read(out) if "vendor" in r]
-    # 9 anchors x (openai,xai,google) + 4 x anthropic = 27 + 4 = 31
-    assert len(recs) == 31, len(recs)
+    # 8 anchors x (openai,xai,google) + 4 x anthropic = 24 + 4 = 28
+    assert len(recs) == 28, len(recs)
     by = lambda v: [r for r in recs if r["vendor"] == v]
-    assert len(by("openai")) == 9 and len(by("xai")) == 9 and len(by("google")) == 9, "9-anchor vendors"
+    assert len(by("openai")) == 8 and len(by("xai")) == 8 and len(by("google")) == 8, "8-anchor vendors"
     assert len(by("anthropic")) == 4, "anthropic 4 anchors"
     assert {r["anchor"] for r in by("anthropic")} == set(L.FOUR), "anthropic = the four stances"
     # Anthropic self-dates: retrieved_at + fetched_texts present
@@ -52,7 +52,7 @@ def test_one_round_shape():
     assert all(r["est_cost_usd"] == 0.0 for r in by("google")), "google free"
     assert all(r["est_cost_usd"] > 0 for r in by("openai") + by("anthropic")), "paid vendors cost > 0"
     os.unlink(out)
-    print("ok test_one_round_shape (31 records, anthropic self-dated, basic tool, google free)")
+    print("ok test_one_round_shape (28 records, anthropic self-dated, basic tool, google free)")
 
 def test_anthropic_cap_stops_only_anthropic():
     calls.clear()
@@ -66,33 +66,33 @@ def test_anthropic_cap_stops_only_anthropic():
     anth = [r for r in recs if r["vendor"] == "anthropic"]
     assert len(anth) <= 4, "anthropic stopped after the first page or two, not all 12"
     # the cheap vendors ran all 3 rounds
-    assert len([r for r in recs if r["vendor"] == "openai"]) == 27, "openai kept going 3x9"
+    assert len([r for r in recs if r["vendor"] == "openai"]) == 24, "openai kept going 3x8"
     os.unlink(out)
     print("ok test_anthropic_cap_stops_only_anthropic (anthropic halted, others ran 3 rounds)")
 
 def test_anthropic_only_custom_anchors():
     calls.clear()
     ap.ask_anthropic, ap.ask_openrouter, ap.ask_gemini = fake_anthropic, fake_openrouter, fake_gemini
-    SIX = ["nist_beacon", "drand", "osm_minute", "stackoverflow", "crates_io", "btc_tip"]
+    FIVE = ["nist_beacon", "drand", "stackoverflow", "crates_io", "btc_tip"]
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f: out = f.name
     L.run(out, rounds=1, interval=0, jitter=0, cap=30.0, mct=8000, label="fill", dry=False,
-          vendors=["anthropic"], vendor_anchors={"anthropic": SIX}, anchor_order=SIX)
+          vendors=["anthropic"], vendor_anchors={"anthropic": FIVE}, anchor_order=FIVE)
     recs = [r for r in read(out) if "vendor" in r]
-    assert len(recs) == 6, len(recs)                                  # anthropic only, 6 anchors
+    assert len(recs) == 5, len(recs)                                  # anthropic only, 5 anchors
     assert all(r["vendor"] == "anthropic" for r in recs), "anthropic only"
-    assert {r["anchor"] for r in recs} == set(SIX), "the six endpoints"
+    assert {r["anchor"] for r in recs} == set(FIVE), "the five endpoints"
     assert all(r["retrieved_at"] and r["fetched_texts"] for r in recs), "self-dated"
     assert not any(v == "google" for v, _, _ in calls), "no other vendor called"
     os.unlink(out)
-    print("ok test_anthropic_only_custom_anchors (6 anthropic records, self-dated, no other vendor)")
+    print("ok test_anthropic_only_custom_anchors (5 anthropic records, self-dated, no other vendor)")
 
 def test_dry_needs_no_keys():
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f: out = f.name
     L.run(out, rounds=1, interval=0, jitter=0, cap=30.0, mct=8000, label="t", dry=True)
     recs = [r for r in read(out) if "vendor" in r]
-    assert len(recs) == 31 and all(r["ok"] for r in recs), "dry produces 31 ok stub records"
+    assert len(recs) == 28 and all(r["ok"] for r in recs), "dry produces 28 ok stub records"
     os.unlink(out)
-    print("ok test_dry_needs_no_keys (31 stub records, no API/keys)")
+    print("ok test_dry_needs_no_keys (28 stub records, no API/keys)")
 
 if __name__ == "__main__":
     test_one_round_shape()

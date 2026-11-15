@@ -2,7 +2,7 @@
 """3-day public-endpoint staleness + cache-lifetime run (aligned 45-min sampling, all vendors).
 
 Every (vendor, anchor) is sampled on the SAME 45-min, 24/7 schedule, so vendors are comparable.
-- OpenAI, xAI, Google: 9 anchors.  Anthropic: 4 (one per Cache-Control stance).
+- OpenAI, xAI, Google: 8 anchors.  Anthropic: 4 (one per Cache-Control stance).
 - Anthropic uses the BASIC web_fetch (web_fetch_20250910, dynamic filtering OFF): cheap (~1-2c/call,
   no 20x bloat) AND its reply carries the fetched text + retrieved_at, so Anthropic self-dates
   (no poller needed for it). The other three are dated against the 1-min/5-min ground-truth poll.
@@ -19,11 +19,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # so `import pu
 import publicPage_run as ap
 from publicPageEndpoint_config import ANCHORS_BY_KEY
 
-# 9 anchors for the live-fetch-dated vendors; 4 (one per Cache-Control stance) for Anthropic.
-NINE = ["hn_maxitem", "nist_beacon", "drand", "osm_minute", "stackoverflow",
+# 8 anchors for the live-fetch-dated vendors; 4 (one per Cache-Control stance) for Anthropic.
+EIGHT = ["hn_maxitem", "nist_beacon", "drand", "stackoverflow",
         "crates_io", "eth_height", "btc_tip", "usgs_quakes"]
 FOUR = ["hn_maxitem", "nist_beacon", "usgs_quakes", "eth_height"]    # no-cache / no-store / max-age / none
-VENDOR_ANCHORS = {"openai": NINE, "xai": NINE, "google": NINE, "anthropic": FOUR}
+VENDOR_ANCHORS = {"openai": EIGHT, "xai": EIGHT, "google": EIGHT, "anthropic": FOUR}
 VENDOR_ORDER = ["openai", "xai", "google", "anthropic"]             # ask all a page's vendors back-to-back
 
 # $/token for the running cost counter (conservative; direct Anthropic billed at Anthropic list $3/$15 per M).
@@ -68,7 +68,7 @@ def run(out_path, rounds, interval, jitter, cap, mct, label, dry,
         vendors=None, vendor_anchors=None, anchor_order=None):
     vendors = vendors or VENDOR_ORDER            # subset override for follow-up runs (e.g. Anthropic-only)
     vendor_anchors = vendor_anchors or VENDOR_ANCHORS
-    anchor_order = anchor_order or NINE
+    anchor_order = anchor_order or EIGHT
     anth_spent, anth_stopped = 0.0, False
     with open(out_path, "a") as fo:
         for rnd in range(rounds):

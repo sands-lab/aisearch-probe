@@ -8,13 +8,13 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from publicPageEndpoint_config import ANCHORS
 
-KEYS = {"hn_maxitem", "nist_beacon", "drand", "osm_minute", "stackoverflow",
+KEYS = {"hn_maxitem", "nist_beacon", "drand", "stackoverflow",
         "crates_io", "eth_height", "btc_tip", "usgs_quakes"}
 POLL = [a for a in ANCHORS if a["key"] in KEYS]
 
 TIMEOUT = 20; socket.setdefaulttimeout(TIMEOUT)
 CTX = ssl.create_default_context(); CTX.check_hostname = False; CTX.verify_mode = ssl.CERT_NONE
-UA = "ai-crawler-cache-probe/1.0 (academic research; ground-truth poller; polite 5min cadence, 9 endpoints)"
+UA = "ai-crawler-cache-probe/1.0 (academic research; ground-truth poller; polite 5min cadence, 8 endpoints)"
 
 def now(): return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 

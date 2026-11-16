@@ -397,10 +397,10 @@ func callers(anthropicModel, openaiModel, googleModel, xaiModel string, openRout
 // still downloads the page (HTTP 200) while the model reports it blocked, which
 // would read as "Google never keeps a copy": a false result. The tool cannot tell
 // a tunnel address from a real domain, so it always warns.
-const googleTunnelWarning = "WARNING: Google will not read pages on tunnel addresses (for example free\n" +
-	"         Cloudflare or ngrok tunnels), localhost or private addresses. It downloads\n" +
-	"         the page but tells the model it is blocked. Use a real domain name for\n" +
-	"         Google results."
+const googleTunnelWarning = "WARNING: Google's URL tool does not support localhost, private networks or\n" +
+	"         tunneling services (https://aistudio.google.com/docs/url-context). Even on a\n" +
+	"         real domain it may refuse a new site for days to weeks. Check Google with\n" +
+	"         -checkVendors before trusting its results (see docs/setup-cdn.md)."
 
 // warnGoogle prints googleTunnelWarning in bold yellow when any Google route is
 // active. It reports whether it printed.

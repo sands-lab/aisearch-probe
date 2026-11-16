@@ -8,9 +8,8 @@ site owners, people who write crawler or caching policy.
 ## What you need
 
 - **A domain name you control**, pointing at a machine that is reachable from the internet. The
-  AI services must be able to download pages from it. Google's fetcher will not read pages on
-  tunnel addresses (free Cloudflare or ngrok tunnels), localhost or private addresses, so use a
-  real domain name if you want Google results.
+  AI services must be able to download pages from it. For Google, see
+  [Google's limits](docs/setup-cdn.md#google) first.
 - **Go 1.22 or newer** to build the two programs.
 - **Python 3.10 or newer** with `matplotlib` and `numpy` for the figures, and `pytest` for the
   tests. The public-page tests also use only Python.
@@ -101,6 +100,7 @@ commands. Add `-dryRun` to any run first: it prints the plan and makes no paid c
 | `-anthropicModel`, `-openaiModel`, `-xaiModel`, `-googleModel`, `-openrouterModels` | Models per route |
 | `-anthropicFetchTool` | Anthropic fetch tool version: `web_fetch_20250910` (no dynamic filtering) or `web_fetch_20260209` (with it) |
 | `-pageCodeSecret`, `-controlSecret` | The two secrets, if not set in the environment |
+| `-pageCodeFile` | A page-code table (page id → its five codes), such as the released data's `page-codes.csv`. Reports then check answers without the secret |
 | `-checkVendors`, `-checkPage`, `-checkRecordFile`, `-checkRecordAge`, `-checkAgain` | The checks above |
 | `-listModels`, `-listModelsAll` | List the models each key can call |
 | `-resolve host:ip` | Use this IP for your own host name, like curl's `--resolve` |

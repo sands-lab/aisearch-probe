@@ -56,9 +56,30 @@ The correction and heal runs then reach the page controls on `http://localhost:8
 their default (`-correction-controlUrl`, `-heal-controlUrl`). That keeps the controls off the
 public address and out of reach of the CDN's bot checks.
 
-## Google and tunnels
+## Google
 
-Google documents that its URL tool does not support tunneling services. A Cloudflare tunnel on
-your own domain name is a real domain; a free throwaway tunnel address is not, and Google will
-then download the page but tell the model it is blocked. `probe-trial` prints a highlighted
-warning on every run that includes a Google route.
+Google's URL tool lists these limits ([URL context
+documentation](https://aistudio.google.com/docs/url-context)):
+
+> The URLs must be publicly accessible on the web. Localhost addresses (e.g., localhost,
+> 127.0.0.1), private networks, and tunneling services (e.g., ngrok, pinggy) are not supported.
+
+What the original runs saw goes further:
+
+- **On a tunnel address,** Google's fetcher downloaded the page in full, and the model then said
+  the address was blocked.
+- **On a real domain name, too,** with and without a CDN, `gemini-2.5-flash` refused a new site
+  without contacting it, for days on one server and about seven weeks on the other, then started
+  reading it. Nothing on the server changed.
+- **`gemini-3.1-flash-lite`** (the default `-googleModel`) reported almost every address as
+  failed, including `example.com`, even when the server log shows it downloaded the page.
+
+**Which model.** The default is `gemini-3.1-flash-lite`, the model the original runs used. The
+tradeoff: it contacts your server, but often reports failure even after downloading the page, so
+its answers need checking against the server log. `gemini-2.5-flash` (`-googleModel
+gemini-2.5-flash`) answered correctly once Google started reading a site, but refused new sites
+for days to weeks, and Google is retiring it.
+
+So Google results need a check before you trust them: run `-checkVendors` on your domain and see
+whether the answer quotes the page's code. `probe-trial` prints a highlighted warning on every
+run that includes a Google route.

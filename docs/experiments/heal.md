@@ -61,6 +61,9 @@ and the third reads the results.
        -heal-reportFile logs/heal-s1.results.json -serverLog logs/probe.jsonl
    ```
 
+   The report checks each answer for the page's codes using your page-code secret. To re-check
+   the released data, which has no secret, add `-pageCodeFile logs/page-codes.csv`.
+
 To repeat the experiment, make a new schedule with a new state file (for example `heal-s2`) on
 another day or at another time.
 

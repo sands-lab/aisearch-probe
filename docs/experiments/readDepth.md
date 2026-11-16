@@ -55,5 +55,6 @@ python3 scripts/readDepth_plot_tokens.py figures/read-window logs/results/truncp
 python3 scripts/readDepth_plot_markers.py figures/read-depth-grid logs/results/truncprobe-run*.jsonl
 ```
 
-`readDepth_plot_markers.py` downloads each page once more to learn its five codes, so the server
-must still be running with the same secret.
+`readDepth_plot_markers.py` works out each page's five codes from your page-code secret
+(`PROBE_PAGE_CODE_SECRET`). For the released data, which has no secret, add
+`--codes logs/page-codes.csv`.

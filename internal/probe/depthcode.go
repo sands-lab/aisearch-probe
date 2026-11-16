@@ -44,8 +44,12 @@ func DepthField(pct int) string {
 }
 
 // DepthCode is the unforgeable code for one depth of one page. Empty secret returns
-// "" so the route can refuse rather than emit a guessable page.
+// "" so the route can refuse rather than emit a guessable page, unless a page-code
+// table is loaded (LoadCodeTable): then the code is looked up there.
 func DepthCode(secret, id string, pct, revision int) string {
+	if secret == "" && codeTable != nil {
+		return codeTable[codeKey(id, pct, revision)]
+	}
 	return CpageCode(secret, id, DepthField(pct), revision)
 }
 

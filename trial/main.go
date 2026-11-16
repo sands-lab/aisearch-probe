@@ -77,6 +77,8 @@ func main() {
 			"Sharing experiment: where to write the steps")
 		pageCodeSecret = flag.String("pageCodeSecret", os.Getenv("PROBE_PAGE_CODE_SECRET"),
 			"Secret to recompute the codes printed on depth pages; must match the server's -pageCodeSecret. Never sent in a URL or a prompt. Defaults to $PROBE_PAGE_CODE_SECRET")
+		pageCodeFile = flag.String("pageCodeFile", "",
+			"Page-code table (origin,page_id,version,depth,code), e.g. the released data's page-codes.csv. Without -pageCodeSecret, every code check reads its codes from this table")
 		controlSecretFlag = flag.String("controlSecret", os.Getenv("PROBE_CONTROL_SECRET"),
 			"Password for the server's page controls (correction, heal); must match the server's -controlSecret. Defaults to $PROBE_CONTROL_SECRET")
 		onlyFlag = flag.String("vendors", "",
@@ -218,6 +220,17 @@ func main() {
 	// flags' os.Getenv defaults were read before loadEnvFile ran, so an
 	// env-file-only secret would otherwise be empty. An explicit flag still wins.
 	*pageCodeSecret = orEnv(*pageCodeSecret, "PROBE_PAGE_CODE_SECRET")
+	if *pageCodeFile != "" {
+		n, err := probe.LoadCodeTable(*pageCodeFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: -pageCodeFile: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "[trial] loaded %d page codes from %s\n", n, *pageCodeFile)
+		if *pageCodeSecret != "" {
+			fmt.Fprintln(os.Stderr, "[trial] -pageCodeSecret is set too; the secret is used, not the table")
+		}
+	}
 	// Same for the control secret (-correction-*, -heal-*): without this an
 	// env-file-only PROBE_CONTROL_SECRET never reaches -controlSecret.
 	*controlSecretFlag = orEnv(*controlSecretFlag, "PROBE_CONTROL_SECRET")
@@ -292,8 +305,52 @@ func main() {
 		}))
 	}
 
-	if *urlFlag == "" && !(*correctionTick || *correctionLoop || *correctionReport) {
-		// The correction run's tick/loop/report read the origin from their state file.
+	// The reports only read a state file and the server log: no API key, no
+	// -siteUrl. With -pageCodeFile they check codes without the secret.
+	if *correctionReport {
+		st, rerr := loadCorrectionState(*correctionState)
+		if rerr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
+			os.Exit(1)
+		}
+		if probeLogPath == "" {
+			fmt.Fprintln(os.Stderr, "error: -serverLog is required; which version each fetch got is read from it")
+			os.Exit(1)
+		}
+		recs, _, lerr := probe.LoadRecords(probeLogPath, "", time.Time{})
+		if lerr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
+			os.Exit(1)
+		}
+		os.Exit(reportCorrection(st, recs))
+	}
+
+	if *healReport {
+		st, rerr := loadHealState(*healState)
+		if rerr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
+			os.Exit(1)
+		}
+		if probeLogPath == "" {
+			fmt.Fprintln(os.Stderr, "error: -serverLog is required; what each request got is read from it")
+			os.Exit(1)
+		}
+		recs, _, lerr := probe.LoadRecords(probeLogPath, "", time.Time{})
+		if lerr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
+			os.Exit(1)
+		}
+		if *healReportJSON != "" {
+			if werr := writeHealResults(*healReportJSON, st, recs, *pageCodeSecret); werr != nil {
+				fmt.Fprintf(os.Stderr, "error: -heal-reportFile: %v\n", werr)
+				os.Exit(1)
+			}
+		}
+		os.Exit(reportHeal(st, recs, *pageCodeSecret))
+	}
+
+	if *urlFlag == "" && !(*correctionTick || *correctionLoop) {
+		// The correction run's step and loop read the origin from their state file.
 		fmt.Fprintln(os.Stderr, "error: -siteUrl is required")
 		flag.Usage()
 		os.Exit(1)
@@ -359,24 +416,6 @@ func main() {
 		refuseUnderDryRun(active)
 	}
 
-	if *correctionReport {
-		st, rerr := loadCorrectionState(*correctionState)
-		if rerr != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
-			os.Exit(1)
-		}
-		if probeLogPath == "" {
-			fmt.Fprintln(os.Stderr, "error: -serverLog is required; which version each fetch got is read from it")
-			os.Exit(1)
-		}
-		recs, _, lerr := probe.LoadRecords(probeLogPath, "", time.Time{})
-		if lerr != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
-			os.Exit(1)
-		}
-		os.Exit(reportCorrection(st, recs))
-	}
-
 	if *correctionPlan {
 		var formats []string
 		for _, f := range strings.Split(*correctionFormats, ",") {
@@ -387,30 +426,6 @@ func main() {
 		os.Exit(planCorrection(*urlFlag, *correctionLocalOrigin, active, formats, *correctionTrials, *correctionSize,
 			*correctionSettle, *correctionWarmGap, *correctionStartAt, *correctionJitter, *correctionReask, *forceFlag,
 			*correctionState, *pageCodeSecret, *controlSecretFlag, *dryRunFlag))
-	}
-
-	if *healReport {
-		st, rerr := loadHealState(*healState)
-		if rerr != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", rerr)
-			os.Exit(1)
-		}
-		if probeLogPath == "" {
-			fmt.Fprintln(os.Stderr, "error: -serverLog is required; what each request got is read from it")
-			os.Exit(1)
-		}
-		recs, _, lerr := probe.LoadRecords(probeLogPath, "", time.Time{})
-		if lerr != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", lerr)
-			os.Exit(1)
-		}
-		if *healReportJSON != "" {
-			if werr := writeHealResults(*healReportJSON, st, recs, *pageCodeSecret); werr != nil {
-				fmt.Fprintf(os.Stderr, "error: -heal-reportFile: %v\n", werr)
-				os.Exit(1)
-			}
-		}
-		os.Exit(reportHeal(st, recs, *pageCodeSecret))
 	}
 
 	if *healPlan {
